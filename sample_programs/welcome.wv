@@ -1,0 +1,73 @@
+print:="||   / |  / /";
+print:="||  /  | / /  ___      ___              ___";    
+print:="|| / /||/ / //___) ) //   ) ) ||  / / //___) )"; 
+print:="||/ / |  / //       //   / /  || / / //    ";    
+print:="|  /  | / ((____   ((___( (   ||/ / ((____";
+print:="";
+print:="Welcome to Weave Programming Language!";
+print:="Weave is a programming language that transforms imperative style";  print:="code into efficient functional code!";
+print:="";
+input("Press Enter to Continue");
+print:="Features";
+print:="====================";
+print:="- C Style Syntax that translates to a functional representation";
+print:="- Strong type inference";
+input("Press Enter to Continue");
+print:="Code Examples:";
+print:="====================";
+
+print:="Hello World!:";
+print:="====================";
+print:="print:='hello world!';";
+print:='hello world!';
+print:="";
+input("Press Enter to Continue");
+
+print:="Count to 10:";
+print:="====================";
+print:="for(i,[1:10]){";
+print:="  print:=i;";
+print:="  a[i]=i;";
+print:="}";
+for(i,[1:10]){
+  print:=i;
+  a[i]:=i;
+}
+print:=a;
+print:="";
+input("Press Enter to Continue");
+
+print:="Factorial:";
+print:="====================";
+print:="factorial(n):={";
+print:="  if(n<=1){";
+print:="    return 1;";
+print:="  }else{";
+print:="   return n*factorial(n-1);";
+print:="  }";
+print:="}";
+print:="print:=factorial(10);";
+factorial:=(n){
+  if(n<=1){
+    return 1;
+  }else{
+    m:=factorial(n-1);
+    return n*m;  
+  }
+}
+print:=factorial(10);
+print:="";
+input("Press Enter to Continue");
+
+
+
+
+print:="RoadMap";
+print:="====================";
+print:="- Pattern Matching";
+print:="- Lazy Evaluation";
+print:="- Multithreaded evalaution";
+print:="- Abstract Data types";
+print:="- Liquid typing; eg a>=0";
+print:="- Monad implementation for better IO abstraction";
+print:="- Recursion analysis";
