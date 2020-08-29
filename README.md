@@ -1,8 +1,10 @@
 # Weave Programming Language
-![Weave](https://zclarke.xyz/weavelang/src/assets/weave.jpg)
-
-[Github](https://github.com/zakerytclarke/weavelang)__________[REPL.it](https://weavelang.weavelang.repl.run/)
+[Github](https://github.com/zakerytclarke/weavelang) [REPL.it](https://weavelang.weavelang.repl.run/)
+![Weave](https://zclarke.xyz/weavelang/src/assets/weave_transform.png)
 Authors: [Elijah Johnson](https://github.com/ElijahJohnson5), [Zakery Clarke](https://zclarke.xyz)
+
+
+
 Welcome to Weave Programming Language!
 Weave is a programming language that transforms imperative style code into efficient functional code. Programming in functional languages is incredibley powerful- offering unmatched expressiveness and program safety. However, programming in a functional style can often be a daunting task.
 
@@ -59,7 +61,7 @@ fib:=(n){
   return fib(n-1)+fib(n-2);
 }
 
-print(fib(5));
+print(show(fib(5)));
 ```
 
 
