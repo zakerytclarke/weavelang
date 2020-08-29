@@ -1,5 +1,5 @@
 # Weave Programming Language
-![Image of Yaktocat](https://octodex.github.com/images/yaktocat.png)
+![Weave](https://zclarke.xyz/weavelang/src/assets/weave.jpg)
 
 [Github](https://github.com/zakerytclarke/weavelang)__________[REPL.it](https://weavelang.weavelang.repl.run/)
 Authors: [Elijah Johnson](https://github.com/ElijahJohnson5), [Zakery Clarke](https://zclarke.xyz)

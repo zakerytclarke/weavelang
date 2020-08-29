@@ -1,8 +1,10 @@
 run: weave
 	./weave ./sample_programs/test.wv
 
-weave: Weave.hs Analyzer.hs Runtime.hs Parser.hs Parselib.hs
-	ghc Weave.hs -outputdir build -o weave
+weave: src/Weave.hs src/Analyzer.hs src/Runtime.hs src/Parser.hs src/Parselib.hs
+	cd src && ghc Weave.hs -outputdir build -o weave && mv weave ../weave 
 
 clean:
-	rm -rf build && rm weave
+	rm -rf src/build && rm weave
+
+

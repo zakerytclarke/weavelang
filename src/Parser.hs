@@ -51,7 +51,7 @@ instance Show Term where
 -}
 
 
-
+--Evaluation Type
 data EvalTerm = L String EvalTerm | A EvalTerm EvalTerm | I String | Float | T | F
 
 {-

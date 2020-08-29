@@ -239,3 +239,9 @@ setType name val (t@(x,_):xs) =
   if x == name 
     then ((name,val):xs) 
     else t : (setType name val xs) 
+
+
+--Transform to Reduced Evaluation Type
+
+--Function Definition
+--transformEval (App (Lambda funcName sexpr) [(Lambda argName sexpr2)]) = (A (L funcName) (L argName (transformEval sexpr2)))
