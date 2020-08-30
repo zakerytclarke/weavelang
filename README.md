@@ -1,7 +1,8 @@
 # Weave Programming Language
-[Github](https://github.com/zakerytclarke/weavelang) [REPL.it](https://weavelang.weavelang.repl.run/)
+[Github](https://github.com/zakerytclarke/weavelang) [repl.it](https://weavelang.weavelang.repl.run/)
 ![Weave](https://zclarke.xyz/weavelang/src/assets/weave_transform.png)
 Authors: [Elijah Johnson](https://github.com/ElijahJohnson5), [Zakery Clarke](https://zclarke.xyz)
+Studying Computer Science at the University of New Mexico
 
 
 
@@ -22,8 +23,8 @@ We have created the Weave programming language to allow C-like programs that tak
 - Strong typing and memory safety
 
 ### What makes Weave better than Haskell?
-- More comnfortable coding style
-- 
+- More comfortable coding style
+- Not confined to functional paradigm
 
 
 
@@ -46,7 +47,17 @@ factorial:=(n){
   return n*factorial(n-1);
 }
 
-print(show(factorial(10)));
+print(factorial(10));
+```
+
+### For Loops
+```
+for(i,[1:10]){
+  print(i);
+  x[i]=i;
+}
+print(x[2]);//Print a single element
+print(x);//Print whole array
 ```
 
 ### Fibonacci
@@ -61,7 +72,7 @@ fib:=(n){
   return fib(n-1)+fib(n-2);
 }
 
-print(show(fib(5)));
+print(fib(5));
 ```
 
 
@@ -80,7 +91,7 @@ fact(n):={return n*fact(n-1);}
 naturalNumbers:=pair(1,map((+1),naturalNumbers));
 take(10,naturalNumbers) => [1,2,3,4,5,6,7,8,9,10]
 ```
-- Multithreaded evalaution
+- Multithreaded evaluation:
   Because of its functionl nature, Weave can be efficiently evaluated in parallel
 - Abstract Data types
 ```
@@ -89,7 +100,17 @@ type Suite = Clubs | Diamonds | Hearts | Spades
 type Point = Point(Number,Number)
 type Shape = Circle(Point,Number) | Rectangle(Point,Point)
 ```
-- Liquid typing; eg a>=0
+- Liquid typing
+```
+factorial(n){
+  n>=0; //Ensure n is positive
+  n:=Integer; //Ensure n is integer;
+  if(n<=1){
+    return 1;
+  }
+  return n*factorial(n-1);
+}
+```
 - Monad implementation for better IO abstraction
-- Recursion analysis
+- Recursion analysis:
   Ensure functions will termintate

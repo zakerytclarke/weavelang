@@ -1,12 +1,7 @@
-module Analyzer (transform,typeCheck) where
+module Analyzer (transform,typeCheck, transformEval) where
 import Parser
 import Data.List  
-
-
---Lambda variable name termThatVariableEquals restOfPrgm
-
-
-
+import Control.Monad.Trans.State
 
 {-
  - Transformer
@@ -25,7 +20,7 @@ transform (t:[]) =
     (FunctionDef [] terms) -> (transform terms)
     (FunctionDef (a:as) terms) -> (Lambda a (transform [(FunctionDef as terms)]))
     --Variable Assignment to Lambda
-    --(Assignment name term) -> (Lambda name (transform [term]) Null)
+    --(Assignment name term) -> (Lambda nam (transform [term]) Null)
     (Assignment name term) -> (App (Lambda name Null) [(transform [term])])
     --If Term needs remaining operations tacked on both ends
     (If bTerm tTerms []) -> (EvalIf bTerm (transform (tTerms)) Null)
@@ -98,128 +93,174 @@ transform (t:ts) =
 
 
 
-
-
-
-
-
-
-
-
 {-
  - Type Checker
  - This function evaluates the type safety of the program
  - and guarantees there will be no run-time errors
  -}
+typeCheckState :: Term -> State (String, [(String, Type)]) Type
+typeCheckState Null = return IO
 
-typeCheck Null frame = (IO, frame)
+typeCheckState Fls = return Boolean
+typeCheckState Tru = return Boolean
 
-typeCheck Fls frame = (Boolean, frame)
-typeCheck Tru frame = (Boolean, frame)
+typeCheckState (Char x) = return Character
+typeCheckState (Number x) = return Numeric
 
-typeCheck (Char x) frame = (Character, frame)
-typeCheck (Number x) frame = (Numeric, frame)
+typeCheckState (Addition x y) = expectedTypes [x,y] [Numeric,Numeric] "(+)" Numeric
+typeCheckState (Subtraction x y) = expectedTypes [x,y] [Numeric,Numeric] "(-)" Numeric
+typeCheckState (Multiplication x y) = expectedTypes [x,y] [Numeric,Numeric] "(*)" Numeric
+typeCheckState (Division x y) = expectedTypes [x,y] [Numeric,Numeric] "(/)" Numeric
+typeCheckState (Exponentiation x y) = expectedTypes [x,y] [Numeric,Numeric] "(^)" Numeric
 
-typeCheck (Addition x y) frame = expectedTypes [x,y] [Numeric,Numeric] "(+)" Numeric frame
-typeCheck (Subtraction x y) frame = expectedTypes [x,y] [Numeric,Numeric] "(-)" Numeric frame
-typeCheck (Multiplication x y) frame = expectedTypes [x,y] [Numeric,Numeric] "(*)" Numeric frame
-typeCheck (Division x y) frame = expectedTypes [x,y] [Numeric,Numeric] "(/)" Numeric frame
-typeCheck (Exponentiation x y) frame = expectedTypes [x,y] [Numeric,Numeric] "(^)" Numeric frame
+typeCheckState (Not x) = expectedTypes [x] [Boolean] "(!)" Boolean
+typeCheckState (And x y) = expectedTypes [x,y] [Boolean,Boolean] "(&&)" Boolean
+typeCheckState (Or x y) = expectedTypes [x,y] [Boolean,Boolean] "(||)" Boolean
+typeCheckState (Equals x y) = do
+  tY <- typeCheckState y
+  expectedTypes [x,y] [tY,tY] "(==)" Boolean 
 
-typeCheck (Not x) frame = expectedTypes [x] [Boolean] "(!)" Boolean frame
-typeCheck (And x y) frame = expectedTypes [x,y] [Boolean,Boolean] "(&&)" Boolean frame
-typeCheck (Or x y) frame = expectedTypes [x,y] [Boolean,Boolean] "(||)" Boolean frame
-typeCheck (Equals x y) frame = expectedTypes [x,y] [tY,tY] "(==)" Boolean frame
-  where (tY, yFrame) = typeCheck y frame
-typeCheck (LessThanEqual x y) frame = expectedTypes [x,y] [Numeric,Numeric] "(<=)" Boolean frame
+typeCheckState (NotEquals x y) = do
+  tY <- typeCheckState y
+  expectedTypes [x,y] [tY,tY] "(!=)" Boolean 
+typeCheckState (LessThan x y) = expectedTypes [x,y] [Numeric,Numeric] "(<)" Boolean
+typeCheckState (LessThanEqual x y) = expectedTypes [x,y] [Numeric,Numeric] "(<=)" Boolean
+typeCheckState (GreaterThan x y) = expectedTypes [x,y] [Numeric,Numeric] "(>)" Boolean
+typeCheckState (GreaterThanEqual x y) = expectedTypes [x,y] [Numeric,Numeric] "(>=)" Boolean
 
-typeCheck (EvalIf x y z) frame = expectedTypes [x,y,z] [Boolean, tY, tY] "if" tY frame 
-  where (tY, yFrame) = typeCheck y frame
+typeCheckState (EvalIf x y z) = do 
+  tX <- typeCheckState x
+  tY <- typeCheckState y
+  expectedTypes [x,y,z] [Boolean, tY, tY] "if" tY 
 
-typeCheck a@(Pair x y) frame = expectedTypes (tList a) (take (length (tList a)) $ repeat fstType) "[]" (List fstType) frame
+typeCheckState a@(Pair x y) = do 
+  fstType <- typeCheckState x
+  expectedTypes (tList a) (take (length (tList a)) $ repeat fstType) "[]" (List fstType)
   where tList (Pair a Null) = [a]
         tList (Pair a b) =  a:(tList b)
-        (fstType, fstFrame) = typeCheck x frame
 
 
-
-typeCheck (Return sexpr) frame = 
-  case typeCheck sexpr frame of
-    (Unknown, _) -> error ("Unable to infer the type for function")
-    (t, newFrame) -> 
-      case fTypeUnwrapper cFuncType of
-        Unknown -> (t,setType "~cFunc" (setfTypeUnwrapper cFuncType t) newFrame)
+-- Return does type inference for function if it can
+typeCheckState (Return sexpr) = do
+  t <- typeCheckState sexpr
+  (funcName,_) <- get
+  case t of
+    Unknown -> error ("Unable to infer the type for function: "++(show funcName))
+    t -> do
+      (funcName, frame) <- get
+      case fTypeUnwrapper (getType funcName frame) of
+        Unknown -> do
+          put (funcName, (setType funcName (setfTypeUnwrapper (getType funcName frame) t) frame))
+          return t
         t1 -> 
           if (t==t1)
-            then (t1,frame)
-            else error ("Return types of function doesn't match")
-      where cFuncType = (getType "~cFunc" newFrame) 
+            then return t1
+            else error ("Return types of function don't match")
   where fTypeUnwrapper (Func x y) = fTypeUnwrapper y
         fTypeUnwrapper y = y 
-        setfTypeUnwrapper (Func x y) t = Func x (fTypeUnwrapper y)
+        setfTypeUnwrapper (Func x y) t = Func x (setfTypeUnwrapper y t)
         setfTypeUnwrapper Unknown t = t
         
     
 
+-- Get function type
+typeCheckState (FuncPtr fname) = do
+  (_,frame) <- get
+  return (getType fname frame)
+typeCheckState (Variable varName) = do
+  (_, frame) <- get
+  return (getType varName frame)
 
-typeCheck (FuncPtr fname) frame = ((getType fname frame),frame)
-typeCheck (Variable varName) frame = ((getType varName frame),frame)
 
-
-typeCheck (App (FuncPtr "show") [arg]) frame = ((List Character), frame)
+typeCheckState (App (FuncPtr "print") [arg]) = do
+  typeCheckState arg 
+  return $ List Character
 --Function call
-typeCheck (App f@(FuncPtr fName) args) frame = expectedTypes args (fTypeUnwrapper fType) fName (fTypeReturnUnwrapper fType) fFrame
-  where (fType, fFrame) = typeCheck f frame
-        fTypeUnwrapper (Func x y) = x : fTypeUnwrapper y
+typeCheckState (App f@(FuncPtr fName) args) = do 
+  fType <- typeCheckState f
+  expectedTypes args (fTypeUnwrapper fType) fName (fTypeReturnUnwrapper fType)
+  where fTypeUnwrapper (Func x y) = x : fTypeUnwrapper y
         fTypeUnwrapper y = [] 
         fTypeReturnUnwrapper (Func x y) = fTypeReturnUnwrapper y
         fTypeReturnUnwrapper y = y 
-        typeWrapHelper (x:[]) = x
-        typeWrapHelper (x:xs) = Func x (typeWrapHelper xs)
 
 --Definition of functions
-typeCheck (App (Lambda funcName sexpr) [f@(Lambda argName sexpr2)]) frame = typeCheck sexpr fFrame
-  where (fReturnType, fFrame) = typeCheck f (setType "~cFunc" Unknown frame)
+typeCheckState (App (Lambda funcName sexpr) [f@(Lambda argName sexpr2)]) = do
+  (_, frame) <- get
+  -- Add new frame, with current function name
+  put (funcName, setType funcName Unknown frame)
+  typeCheckState f
+  typeCheckState sexpr
 --Definition of Variables
-typeCheck (App (Lambda varName sexpr) [val]) frame = typeCheck sexpr (setType varName (fst (typeCheck val frame)) frame)
-
--- CFUNC NEEDS TO POINT TO CURRENT FUNCTION, and DEFINE FUNCTION NAME TO UNKNOWN
-typeCheck (Lambda varName sexpr) frame = 
-  case (typeCheck sexpr (setType varName Unknown frame)) of
-    (t,newFrame) -> 
-      if ((getType varName newFrame)==Unknown)
-        then error ("Unused variable: "++(show varName) ++ show newFrame)
-        else ((Func (getType varName newFrame) t), newFrame)
+typeCheckState (App (Lambda varName sexpr) [val]) = do 
+  varType <- typeCheckState val
+  (funcName,frame) <- get
+  put (funcName, setType varName varType frame)
+  typeCheckState sexpr
 
 
---Func call
-{-
-typeCheck (App (FuncPtr fName) args) frame = 
-  case getFrame fName frame of
-    (Func argTypes retType) -> expectedTypes argTypes (map typeCheck args) fName retType frame
--}
+-- Function Arguments
+typeCheckState (Lambda varName sexpr) = do
+  (funcName,frame) <- get
+  put (funcName, setType varName Unknown frame)
+  (funcName,frame) <- get
+  put (funcName, setType funcName (addArg (UnknownArg varName) (getType funcName frame)) frame)
+  t <- typeCheckState sexpr
+  (funcName,newFrame) <- get
+  if (getType varName newFrame) == Unknown
+    then error ("Unused variable: "++(show varName) ++ " in function: " ++ (show funcName))
+    else return $ (Func (getType varName newFrame) t)
+    where addArg t (Func x y) = (Func x (addArg t y))
+          addArg t y = (Func t y) 
+
 --Todo convert to Arr Char type
-typeCheck (Concat x y) frame = expectedTypes [x,y] [Character,Character] "(++)" Boolean frame
+typeCheckState (Concat x y) = expectedTypes [x,y] [Character,Character] "(++)" Boolean
 
 
+--typeCheck :: Term -> (String, [(String, Type)]) -> Type
+typeCheck ts initialState = runState (typeCheckState ts) initialState
 
-
-
-expectedTypes as ts op r frame = expectedTypesHelper as ts op 1 r frame
+-- Expected types
+-- Makes sure the expected types match the actual types. Does type inference for unknown variables 
+-- and sometimes function return types
+expectedTypes as ts op r = expectedTypesHelper as ts op 1 r
   where 
-    expectedTypesHelper [] _ _ _ r frame = (r,frame)
-    expectedTypesHelper (a:as) (t:ts) op n r frame = 
+    expectedTypesHelper [] _ _ _ r = return r
+    expectedTypesHelper (a:as) (t:ts) op n r = do
+      aT <- typeCheckState a
       case t==aT of
-        True -> (expectedTypesHelper as ts op (n+1) r aFrame)
+        True -> (expectedTypesHelper as ts op (n+1) r)
         False -> 
           if (aT==Unknown)
             then 
               case a of
-                (Variable name) -> (expectedTypesHelper as ts op (n+1) r (setType name t aFrame)) --Type inference for variable 
-                _ ->  error errMsg
+                (Variable name) -> do
+                  --Type inference for variable 
+                  (funcName, frame) <- get
+                  put (funcName, setType name t frame)
+                  (funcName, frame) <- get
+                  put (funcName, setType funcName (updateArgs name t (getType funcName frame)) frame)
+                  (expectedTypesHelper as ts op (n+1) r)
+                (App (FuncPtr funcName) sexpr) -> do
+                  (fName, frame) <- get
+                  if (funcName == fName) 
+                    then do
+                      put (funcName, setType funcName (updateReturn t (getType funcName frame)) frame)
+                      (expectedTypesHelper as ts op (n+1) r)
+                    else error errMsg 
+                _ -> error errMsg
             else error errMsg
-     where (aT, aFrame) = typeCheck a frame
-           errMsg = ("\nError in " ++ (numArg n) ++" argument of "++(show op)++":\n    Expected Type: "++(show t)++"\n    Actual Type: "++(show aT))
+          where updateReturn t (Func x y) = Func x (updateReturn t y)
+                updateReturn t y = t
+                updateArgs name t (Func x y) = 
+                  case x of
+                    (UnknownArg aName) -> 
+                      if (aName == name)
+                        then (Func t y)
+                        else (Func x (updateArgs name t y))
+                    _ -> (Func x (updateArgs name t y))
+                updateArgs name t y = y 
+                errMsg = ("\nError in " ++ (numArg n) ++" argument of "++(show op)++":\n    Expected Type: "++(show t)++"\n    Actual Type: "++(show aT))
     numArg 1 = "1st"
     numArg 2 = "2nd"
     numArg 3 = "3rd"
@@ -243,5 +284,45 @@ setType name val (t@(x,_):xs) =
 
 --Transform to Reduced Evaluation Type
 
---Function Definition
---transformEval (App (Lambda funcName sexpr) [(Lambda argName sexpr2)]) = (A (L funcName) (L argName (transformEval sexpr2)))
+--Basic Type Transformations
+transformEval (Number f) = N f
+transformEval (Char c) = C c
+transformEval Tru = B 1
+transformEval Fls = B 0
+
+--Predefined functions
+transformEval (Addition x y) = A (A (I "~+") (transformEval x)) (transformEval y)
+transformEval (Subtraction x y) = A (A (I "~-") (transformEval x)) (transformEval y)
+transformEval (Multiplication x y) = A (A (I "~*") (transformEval x)) (transformEval y)
+transformEval (Division x y) = A (A (I "~/") (transformEval x)) (transformEval y)
+transformEval (Exponentiation x y) = A (A (I "~^") (transformEval x)) (transformEval y)
+transformEval (Not x) = A (I "~!") (transformEval x)
+transformEval (And x y) = A (A (I "~&&") (transformEval x)) (transformEval y)
+
+transformEval (Or x y) = A (A (I "||") (transformEval x)) (transformEval y)
+transformEval (Equals x y) = A (A (I "~==") (transformEval x)) (transformEval y)
+transformEval (NotEquals x y) = A (A (I "!=") (transformEval x)) (transformEval y)
+transformEval (LessThan x y) = A (A (I "<") (transformEval x)) (transformEval y)
+transformEval (LessThanEqual x y) = A (A (I "~<=") (transformEval x)) (transformEval y)
+transformEval (GreaterThan x y) = A (A (I ">") (transformEval x)) (transformEval y)
+transformEval (GreaterThanEqual x y) = A (A (I ">=") (transformEval x)) (transformEval y)
+transformEval (EvalIf x y z) = (A (A (A (I "~if") (transformEval x)) (transformEval y)) (transformEval z))
+transformEval (Pair x y) = A (A (I "pair") (transformEval x)) (transformEval y)
+transformEval (Head x) = A (I "head") (transformEval x)
+transformEval (Tail x) = A (I "tail") (transformEval x)
+transformEval (Concat x y) = A (A (I "++") (transformEval x)) (transformEval y)
+
+transformEval (Map f ls) = A (A (I "map") (transformEval f)) (transformEval ls)
+
+transformEval (Return x) = transformEval x
+
+transformEval (Variable name) = I name
+transformEval Null = I "null"
+
+
+transformEval (App f@(FuncPtr fName) args) = helper (reverse args)
+  where helper [x] = (A (I fName) (transformEval x))
+        helper (x:xs) = A (helper xs) (transformEval x)
+
+transformEval (Lambda n sepxr) = (L n (transformEval sepxr))
+transformEval (App sexpr [arg]) = (A (transformEval sexpr) (transformEval arg))

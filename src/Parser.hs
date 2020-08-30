@@ -4,7 +4,21 @@ import Parselib
 import Data.Char
 
 
-data Type =  Boolean | Int | Numeric | Character | Func Type Type | Unknown | List Type | IO deriving(Show,Eq)
+data Type =  Boolean | Int | Numeric | Character | Func Type Type | Unknown | UnknownArg String | List Type | IO deriving(Eq)
+
+instance Show Type where
+  show Boolean = "Bool"
+  show Numeric = "Num"
+  show Character = "Char"
+  show f@(Func x y) = "(" ++ showFuncHelper f ++ ")"
+  show Unknown = "Unknown"
+  show (UnknownArg a) = "UnknownArg " ++ show a
+  show (List Character) = "String"
+  show (List a) = "List " ++ show a
+  show IO = "IO"
+
+showFuncHelper (Func x y) = showFuncHelper x ++ "->" ++ showFuncHelper y
+showFuncHelper y = show y
 
 data Term = FunctionDef [String] [Term] 
   | Tru 
@@ -52,20 +66,36 @@ instance Show Term where
 
 
 --Evaluation Type
-data EvalTerm = L String EvalTerm | A EvalTerm EvalTerm | I String | Float | T | F
-
-{-
-instance Show Term where
-  show (Tru) = "true"
-  show (Fls) = "false"
--}
-  
---Lambda varName Term1
---App (Lambda varName Term1) Term2      (Assignment)
+data EvalTerm = L String EvalTerm --Lambda Abstraction
+  | A EvalTerm EvalTerm  --Application
+  | AB EvalTerm EvalTerm --Built in Function 
+  | I String --Variable & Function references
+  | N Float --Number 
+  | C Float --Character
+  | B Float deriving(Eq) -- Boolean
 
 
+instance Show EvalTerm where
+  show (L s t) = "(λ"++s++". "++(show t)++")"
+  show p@(A (A (I "pair") x) y) = "'" ++ showPairHelper p ++ "'"
+  show (I "null") = ""
+  show (A (I n) a) = show (I n)++" "++(show a)++" "
+  show (A s a) = "("++show s++")"++(show a)
+  show (I name) = name
+  show (C a) = [chr (round a)]
+  show (N a) = show a
+  show (B 0) = "F"
+  show (B 1) = "T"
+  show (B (-1)) = "Null"
 
-prgm = (many statement)
+showPairHelper (A (A (I "pair") (C x)) (C y)) = [chr $ round x] ++ [chr $ round y]
+showPairHelper (A (A (I "pair") (C x)) y) = [chr $ round x] ++ showPairHelper y
+showPairHelper (A (A (I "pair") x) (C y)) = showPairHelper x ++ [chr $ round y]
+showPairHelper (A (A (I "pair") x) y) = showPairHelper x ++ showPairHelper y
+showPairHelper y = show y
+
+
+prgm = space >> (many statement)
 
 
 statement = 
@@ -97,9 +127,6 @@ statement =
  
 
 exprList = sepby expr (symb ",")
-
---do { a <-expr; space; symb ","; space; b <- exprList; return ([a]++b)} +++ do {c <- expr; return [c]}
-
 
 
 expr = addy

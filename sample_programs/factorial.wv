@@ -1,8 +1,11 @@
 factorial:=(n){
-  if (n <= 1) {
-    return 1;
+  if (n >= 1) {
+    return n*factorial(n-1);
   }
-  return n*factorial(n-1);
+  return 1;
 }
 
-print(show(factorial(10)));
+print(factorial(10));
+
+
+

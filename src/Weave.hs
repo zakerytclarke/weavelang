@@ -20,8 +20,8 @@ import Runtime
  - that is parsed, analyzed and executed
  -}
 main = do  
-  --putStrLn "Weave Programming Language"
-  --putStrLn "=============================="
+  putStrLn "Weave Programming Language"
+  putStrLn "=============================="
   args <- getArgs --Program path
   if ((length args)/=1)
     then fail "Please specify a single file as an argument to run your program"
@@ -33,17 +33,27 @@ main = do
         ast -> do--Parsed Correctly
                 --putStrLn $ show ast
                 let trans = (transform ast)
-                putStrLn $ show trans
+                --putStrLn $ show trans
                 --eval optimized []
                 let typeChecked = (typeCheck trans defaultTypes)
-                putStrLn $ show typeChecked
-                --case typeChecked of
-                  --t -> do
-                    --    putStrLn $ show t
+                putStrLn "\nTypes:"
+                putStrLn "============================"
+                putStrLn $ prettyPrintFrame (snd (snd typeChecked))
+                let simplified = (transformEval trans)
+                putStrLn "Simplified λ Calculus:"
+                putStrLn "============================"
+                putStrLn $ show simplified
+                putStrLn "\nRun Program:"
+                putStrLn "============================"
+                eval simplified
                 
-                
+
+prettyPrintFrame [] = ""
+prettyPrintFrame ((n,t):xs) = if n=="_" 
+                                then (prettyPrintFrame xs) 
+                                else (n++": "++(show t)++"\n"++(prettyPrintFrame xs))
   
 
-defaultTypes =
+defaultTypes = ("_",
   [ ("input",(Func (List Character) (List Character))),
-    ("print",(Func (List Character) IO))]
+    ("print",(Func (List Character) IO)) ])
