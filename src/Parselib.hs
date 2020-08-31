@@ -21,7 +21,7 @@ combinators that were not discussed in the article for reasons of space:
 
 module Parselib
    (Parser, item, sat, (+++), string, many, many1, sepby, sepby1,
-    chainl, chainl1, char, digit, lower, upper, letter, alphanum,
+    chainl, chainl1, chainr1, chainr, char, digit, lower, upper, letter, alphanum,
     symb, ident, nat, int, token, apply, parse, space, integer, natural) where
 
 import Data.Char
@@ -104,6 +104,18 @@ p `chainl1` op   = do {a <- p; rest a}
                    where
                       rest a = do {f <- op; b <- p; rest (f a b)}
                                +++ return a
+
+chainr :: Parser a -> Parser (a -> a -> a) -> a -> Parser a
+chainr p op a = (p `chainr1` op) <|> pure a
+
+chainr1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+chainr1 p op = scan
+    where
+        scan   = p >>= rest
+        rest a = (do
+            f <- op
+            b <- scan
+            rest (f a b)) <|> pure a
 
 -- Useful parsers: ---------------------------------------------------
 

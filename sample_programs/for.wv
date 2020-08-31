@@ -1,7 +1,5 @@
 for(i,[0:10]){
   print(i);
-  x[i]=i;
+  x[i]:=i;
 }
-
-print(x[2]);
 print(x);

@@ -1,5 +1,6 @@
 # Weave Programming Language
-[Github](https://github.com/zakerytclarke/weavelang) [repl.it](https://weavelang.weavelang.repl.run/)
+(Created during the Repl.it Programming Language Jam 2020)
+[Github](https://github.com/zakerytclarke/weavelang) [Repl.it](https://weavelang.weavelang.repl.run/)
 ![Weave](https://zclarke.xyz/weavelang/src/assets/weave_transform.png)
 Authors: [Elijah Johnson](https://github.com/ElijahJohnson5), [Zakery Clarke](https://zclarke.xyz)
 Studying Computer Science at the University of New Mexico

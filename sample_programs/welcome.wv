@@ -5,7 +5,8 @@ print("||/ / |  / //       //   / /  || / / //    ");
 print("|  /  | / ((____   ((___( (   ||/ / ((____");
 print("");
 print("Welcome to Weave Programming Language!");
-print("Weave is a programming language that transforms imperative style");  print("code into efficient functional code!");
+print("Weave is a programming language that transforms imperative style");  
+print("code into efficient functional code!");
 print("");
 input("Press Enter to Continue");
 print("Features");
@@ -30,13 +31,12 @@ print("  print(i);");
 print("  a[i]=i;");
 print("}");
 
-print(a);
 print("");
 input("Press Enter to Continue");
 
 print("Factorial:");
 print("====================");
-print("factorial(n):={");
+print("factorial:=(n){");
 print("  if(n<=1){");
 print("    return 1;");
 print("  }else{");
@@ -55,8 +55,30 @@ print(factorial(10));
 print("");
 input("Press Enter to Continue");
 
-
-
+print("Fibonacci:");
+print("====================");
+print("fib:=(n){");
+print("  if(n==0){");
+print("    return 0;");
+print("  }");
+print("  if(n==1){");
+print("    return 1;");
+print("  }");
+print("  return fib(n-1) + fib(n-2)");
+print("}");
+print("print(fib(8));");
+fib:=(n){
+  if(n==0){
+    return 0;
+  }
+  if(n==1){
+    return 1;
+  }
+  return fib(n-1)+fib(n-2);
+}
+print(fib(8));
+print("");
+input("Press Enter to Continue");
 
 print("RoadMap");
 print("====================");
@@ -67,3 +89,4 @@ print("- Abstract Data types");
 print("- Liquid typing; eg a>=0");
 print("- Monad implementation for better IO abstraction");
 print("- Recursion analysis");
+print("- Better error handling");

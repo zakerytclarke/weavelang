@@ -1,7 +1,9 @@
+{-# LANGUAGE BangPatterns #-}
 module Analyzer (transform,typeCheck, transformEval) where
 import Parser
 import Data.List  
 import Control.Monad.Trans.State
+import Debug.Trace
 
 {-
  - Transformer
@@ -10,8 +12,9 @@ import Control.Monad.Trans.State
  - type safety, efficiency, and allow performance gains
  -}
 
-
+transform :: [Term] -> Term
 --Finished Transforming
+transform [] = Null
 transform (t:[]) =
   case t of 
     --Drop Return and ignore remaining terms
@@ -22,10 +25,12 @@ transform (t:[]) =
     --Variable Assignment to Lambda
     --(Assignment name term) -> (Lambda nam (transform [term]) Null)
     (Assignment name term) -> (App (Lambda name Null) [(transform [term])])
+    (AssignmentArr name index term) -> (App (Lambda "~assignArr" Null) [(App (Variable name) [(App (transform [index]) [(transform [term])])])])
     --If Term needs remaining operations tacked on both ends
     (If bTerm tTerms []) -> (EvalIf bTerm (transform (tTerms)) Null)
     --If Else Term needs raamining operations tacked on both ends
     (If bTerm tTerms fTerms) -> (EvalIf bTerm (transform (tTerms)) (transform (fTerms)))
+    (For ident (Number a) (Number b) fTerms) -> (EvalFor (Variable ident) (Number (fromIntegral (round a))) (Number (fromIntegral (round b))) (transform fTerms) Null)
     --Function Applications
     (FunctionCall name args) -> (App (FuncPtr name) (map (\x -> transform [x]) args))
     --Handle all other cases as identity
@@ -34,6 +39,7 @@ transform (t:[]) =
     (Multiplication a b) -> (Multiplication (transform [a]) (transform [b]))
     (Division a b) -> (Division (transform [a]) (transform [b]))
     (Exponentiation a b) -> (Exponentiation (transform [a]) (transform [b]))
+    (Mod a b) -> (Mod (transform [a]) (transform [b]))
     (Not a) -> (Not (transform [a]))
     (And a b) -> (And (transform [a]) (transform [b]))
     (Or a b) -> (Or (transform [a]) (transform [b]))
@@ -44,7 +50,7 @@ transform (t:[]) =
     (LessThan a b) -> (LessThan (transform [a]) (transform [b]))
     (LessThanEqual a b) -> (LessThanEqual (transform [a]) (transform [b]))
     (Pair a b) -> (Pair (transform [a]) (transform [b]))
-    (Concat a b) -> (Concat (transform [a]) (transform [b]))
+    (Append a b) -> (Append (transform [a]) (transform [b]))
     (Head a) -> (Head (transform [a]))
     (Tail a) -> (Tail (transform [a]))
     (Map a b) -> (Map (transform [a]) (transform [b]))
@@ -60,11 +66,13 @@ transform (t:ts) =
     (FunctionDef (a:as) terms) -> (Lambda a (transform [(FunctionDef as terms)]))
     --Variable Assignment to Lambda
     (Assignment name term) -> (App (Lambda name (transform ts)) [(transform [term])])
+    (AssignmentArr name index term) -> (App (Lambda "~assignArr" (transform ts)) [(App (Variable name) [(App (transform [index]) [(transform [term])])])])
     --(Assignment name term) -> (Lambda name (transform [term]))
     --If Term needs remaining operations tacked on both ends
     (If bTerm tTerms []) -> (EvalIf bTerm (transform (tTerms++ts)) (transform ts))
     --If Else Term needs raamining operations tacked on both ends
     (If bTerm tTerms fTerms) -> (EvalIf bTerm (transform (tTerms++ts)) (transform (fTerms++ts)))
+    (For ident (Number a) (Number b) fTerms) -> (EvalFor (Variable ident) (Number (fromIntegral (round a))) (Number (fromIntegral (round b))) (transform fTerms) (transform ts))
     --Drop Return and ignore remaining terms
     (Return term) -> Return (transform [term])
     --Function Applications
@@ -75,6 +83,7 @@ transform (t:ts) =
     (Multiplication a b) -> (Multiplication (transform [a]) (transform [b]))
     (Division a b) -> (Division (transform [a]) (transform [b]))
     (Exponentiation a b) -> (Exponentiation (transform [a]) (transform [b]))
+    (Mod a b) -> (Mod (transform [a]) (transform [b]))
     (Not a) -> (Not (transform [a]))
     (And a b) -> (And (transform [a]) (transform [b]))
     (Or a b) -> (Or (transform [a]) (transform [b]))
@@ -85,7 +94,7 @@ transform (t:ts) =
     (LessThan a b) -> (LessThan (transform [a]) (transform [b]))
     (LessThanEqual a b) -> (LessThanEqual (transform [a]) (transform [b]))
     (Pair a b) -> (Pair (transform [a]) (transform [b]))
-    (Concat a b) -> (Concat (transform [a]) (transform [b]))
+    (Append a b) -> (Append (transform [a]) (transform [b]))
     (Head a) -> (Head (transform [a]))
     (Tail a) -> (Tail (transform [a]))
     (Map a b) -> (Map (transform [a]) (transform [b]))
@@ -100,9 +109,15 @@ transform (t:ts) =
  -}
 typeCheckState :: Term -> State (String, [(String, Type)]) Type
 typeCheckState Null = return IO
-
 typeCheckState Fls = return Boolean
 typeCheckState Tru = return Boolean
+typeCheckState EmptyList = return (List Unknown)
+
+typeCheckState (App (Lambda "~assignArr" rest) [(App (Variable name) [(App index [term])])]) = do
+  tType <- typeCheckState term
+  (f, frame) <- get
+  put (f, setType name (List tType) frame)
+  typeCheckState rest
 
 typeCheckState (Char x) = return Character
 typeCheckState (Number x) = return Numeric
@@ -112,17 +127,31 @@ typeCheckState (Subtraction x y) = expectedTypes [x,y] [Numeric,Numeric] "(-)" N
 typeCheckState (Multiplication x y) = expectedTypes [x,y] [Numeric,Numeric] "(*)" Numeric
 typeCheckState (Division x y) = expectedTypes [x,y] [Numeric,Numeric] "(/)" Numeric
 typeCheckState (Exponentiation x y) = expectedTypes [x,y] [Numeric,Numeric] "(^)" Numeric
+typeCheckState (Mod x y) = expectedTypes [x,y] [Numeric,Numeric] "(%)" Numeric
 
 typeCheckState (Not x) = expectedTypes [x] [Boolean] "(!)" Boolean
 typeCheckState (And x y) = expectedTypes [x,y] [Boolean,Boolean] "(&&)" Boolean
 typeCheckState (Or x y) = expectedTypes [x,y] [Boolean,Boolean] "(||)" Boolean
 typeCheckState (Equals x y) = do
   tY <- typeCheckState y
-  expectedTypes [x,y] [tY,tY] "(==)" Boolean 
+  case tY of
+    Unknown -> do
+      tX <- typeCheckState x
+      case tX of
+        Unknown -> expectedTypes [x,y] [Unknown, Unknown] "(==)" Boolean
+        _ -> expectedTypes [x,y] [tX, tX] "(==)" Boolean
+    _ -> expectedTypes [x,y] [tY,tY] "(==)" Boolean 
+
 
 typeCheckState (NotEquals x y) = do
   tY <- typeCheckState y
-  expectedTypes [x,y] [tY,tY] "(!=)" Boolean 
+  case tY of
+    Unknown -> do
+      tX <- typeCheckState x
+      case tX of
+        Unknown -> expectedTypes [x,y] [Unknown, Unknown] "(!=)" Boolean
+        _ -> expectedTypes [x,y] [tX, tX] "(!=)" Boolean
+    _ -> expectedTypes [x,y] [tY,tY] "(!=)" Boolean 
 typeCheckState (LessThan x y) = expectedTypes [x,y] [Numeric,Numeric] "(<)" Boolean
 typeCheckState (LessThanEqual x y) = expectedTypes [x,y] [Numeric,Numeric] "(<=)" Boolean
 typeCheckState (GreaterThan x y) = expectedTypes [x,y] [Numeric,Numeric] "(>)" Boolean
@@ -133,13 +162,31 @@ typeCheckState (EvalIf x y z) = do
   tY <- typeCheckState y
   expectedTypes [x,y,z] [Boolean, tY, tY] "if" tY 
 
+
+typeCheckState (EvalFor (Variable varName) (Number start) (Number end) term rest) = do
+  (f, frame) <- get
+  put (f, setType varName Numeric frame);
+  tT <- typeCheckState term
+  if(start>=end)
+    then error ("Invalid for loop bounds ["++(show start)++":"++(show end)++"]")
+    else do
+      expectedTypes [(Number start),(Number end)] [Numeric,Numeric] "for" tT
+      typeCheckState rest
+      return tT
+
 typeCheckState a@(Pair x y) = do 
   fstType <- typeCheckState x
   expectedTypes (tList a) (take (length (tList a)) $ repeat fstType) "[]" (List fstType)
-  where tList (Pair a Null) = [a]
+  where tList (Pair a EmptyList) = [a]
         tList (Pair a b) =  a:(tList b)
+       
+typeCheckState (Append x y) = do
+  tFst <- typeCheckState x
+  case tFst of
+    (List t) -> expectedTypes [x,y] [tFst,tFst] "(++)" tFst
+    _ -> error ("Cannot append type " ++ show tFst ++ " because it is not a list")
 
-
+  
 -- Return does type inference for function if it can
 typeCheckState (Return sexpr) = do
   t <- typeCheckState sexpr
@@ -169,12 +216,43 @@ typeCheckState (FuncPtr fname) = do
   return (getType fname frame)
 typeCheckState (Variable varName) = do
   (_, frame) <- get
-  return (getType varName frame)
+  let !t = getType varName frame
+    in return t
 
+typeCheckState (VariableArr varName index) = do
+  tIndex <- (typeCheckState index)
+  case tIndex of
+    Numeric -> do
+                (_, frame) <- get
+                let !t = getType varName frame
+                  in return t
+    _ -> error "Array access index is not a number"
 
+--Built in function calls
 typeCheckState (App (FuncPtr "print") [arg]) = do
-  typeCheckState arg 
+  typeCheckState arg
   return $ List Character
+
+typeCheckState (App (FuncPtr "input") [arg]) = expectedTypes [arg] [(List Character)] "input" (List Character)
+
+typeCheckState (App (FuncPtr "head") [arg]) = do
+  eArg <- typeCheckState arg
+  case eArg of 
+    (List tL) -> return tL --First Element Type
+    t -> error ("\nError in 1st argument of \"head\":\n    Expected Type: List _\n    Actual Type: "++(show t))
+
+typeCheckState (App (FuncPtr "tail") [arg]) = do
+  eArg <- typeCheckState arg
+  case eArg of 
+    (List tL) -> return (List tL) --First Element Type
+    t -> error ("\nError in 1st argument of \"tail\":\n    Expected Type: List _\n    Actual Type: "++(show t))
+
+typeCheckState (App (FuncPtr "length") [arg]) = do
+  eArg <- typeCheckState arg
+  case eArg of 
+    (List tL) -> return Numeric 
+    t -> error ("\nError in 1st argument of \"map\":\n    Expected Type: List _\n    Actual Type: "++(show t))
+
 --Function call
 typeCheckState (App f@(FuncPtr fName) args) = do 
   fType <- typeCheckState f
@@ -213,9 +291,6 @@ typeCheckState (Lambda varName sexpr) = do
     where addArg t (Func x y) = (Func x (addArg t y))
           addArg t y = (Func t y) 
 
---Todo convert to Arr Char type
-typeCheckState (Concat x y) = expectedTypes [x,y] [Character,Character] "(++)" Boolean
-
 
 --typeCheck :: Term -> (String, [(String, Type)]) -> Type
 typeCheck ts initialState = runState (typeCheckState ts) initialState
@@ -223,6 +298,7 @@ typeCheck ts initialState = runState (typeCheckState ts) initialState
 -- Expected types
 -- Makes sure the expected types match the actual types. Does type inference for unknown variables 
 -- and sometimes function return types
+expectedTypes :: [Term] -> [Type] -> String -> Type -> State (String, [(String, Type)]) Type
 expectedTypes as ts op r = expectedTypesHelper as ts op 1 r
   where 
     expectedTypesHelper [] _ _ _ r = return r
@@ -265,8 +341,6 @@ expectedTypes as ts op r = expectedTypesHelper as ts op 1 r
     numArg 2 = "2nd"
     numArg 3 = "3rd"
     numArg n = (show n)++"th"
-    
-    
 
 --Variable Type Frame Helpers
 getType name [] = error ("Undefined variable: "++ show name)
@@ -296,27 +370,38 @@ transformEval (Subtraction x y) = A (A (I "~-") (transformEval x)) (transformEva
 transformEval (Multiplication x y) = A (A (I "~*") (transformEval x)) (transformEval y)
 transformEval (Division x y) = A (A (I "~/") (transformEval x)) (transformEval y)
 transformEval (Exponentiation x y) = A (A (I "~^") (transformEval x)) (transformEval y)
+transformEval (Mod x y) = A (A (I "~%") (transformEval x)) (transformEval y)
 transformEval (Not x) = A (I "~!") (transformEval x)
 transformEval (And x y) = A (A (I "~&&") (transformEval x)) (transformEval y)
 
-transformEval (Or x y) = A (A (I "||") (transformEval x)) (transformEval y)
+transformEval (Or x y) = A (A (I "~||") (transformEval x)) (transformEval y)
 transformEval (Equals x y) = A (A (I "~==") (transformEval x)) (transformEval y)
-transformEval (NotEquals x y) = A (A (I "!=") (transformEval x)) (transformEval y)
-transformEval (LessThan x y) = A (A (I "<") (transformEval x)) (transformEval y)
+transformEval (NotEquals x y) = A (A (I "~!=") (transformEval x)) (transformEval y)
+transformEval (LessThan x y) = A (A (I "~<") (transformEval x)) (transformEval y)
 transformEval (LessThanEqual x y) = A (A (I "~<=") (transformEval x)) (transformEval y)
-transformEval (GreaterThan x y) = A (A (I ">") (transformEval x)) (transformEval y)
-transformEval (GreaterThanEqual x y) = A (A (I ">=") (transformEval x)) (transformEval y)
+transformEval (GreaterThan x y) = A (A (I "~>") (transformEval x)) (transformEval y)
+transformEval (GreaterThanEqual x y) = A (A (I "~>=") (transformEval x)) (transformEval y)
 transformEval (EvalIf x y z) = (A (A (A (I "~if") (transformEval x)) (transformEval y)) (transformEval z))
-transformEval (Pair x y) = A (A (I "pair") (transformEval x)) (transformEval y)
-transformEval (Head x) = A (I "head") (transformEval x)
-transformEval (Tail x) = A (I "tail") (transformEval x)
-transformEval (Concat x y) = A (A (I "++") (transformEval x)) (transformEval y)
+
+transformEval (EvalFor (Variable var) (Number start) (Number end) term rest) = forCalls start
+  where forCalls current = 
+          if current > end 
+            then transformEval rest 
+            else (A (L "_" (forCalls (current+1))) (A (L var tTerm) (N current)))
+        tTerm = transformEval term
+
+transformEval (Pair x y) = A (A (I "~pair") (transformEval x)) (transformEval y)
+transformEval (Head x) = A (I "~head") (transformEval x)
+transformEval (Tail x) = A (I "~tail") (transformEval x)
+transformEval (Append x y) = A (A (I "append") (transformEval x)) (transformEval y)
 
 transformEval (Map f ls) = A (A (I "map") (transformEval f)) (transformEval ls)
 
 transformEval (Return x) = transformEval x
 
 transformEval (Variable name) = I name
+transformEval (VariableArr name index) = A (A (I "~lookupArr") (I name)) (transformEval index)
+transformEval EmptyList = I "[]"
 transformEval Null = I "null"
 
 
