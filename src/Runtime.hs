@@ -7,7 +7,7 @@ import Control.Monad.Trans.State
 import Control.Monad.IO.Class (liftIO)
 
 
-evalS :: EvalTerm -> (StateT [[(String, EvalTerm)]] IO) EvalTerm
+evalS :: EvalTerm -> (StateT [(String, EvalTerm)] IO) EvalTerm
 evalS (I "[]") = return $ (B (-1))
 evalS (I "null") = return $ (B (-1))
 -- All functions should only look in their closure
@@ -38,12 +38,11 @@ evalS (A (L name sexpr) (A (I "input") arg)) = do
 evalS (A (L "~assignArr" rest) (A (I name) (A index term))) = do
   eIndex <- evalS index
   eTerm <- evalS term
-  (frame:rs) <- get
-  let ls = getVarSafe name (frame:rs)
+  frame <- get
+  let ls = getVarSafe name frame
   case eIndex of
     (N i) -> do
-              put ((setVar name (unwrapLs ls i eTerm) frame):rs)
-              a <- get
+              put (setVar name (unwrapLs ls i eTerm) frame)
               evalS rest
   where unwrapLs (B (-1)) n eTerm = unwrapLs (I "[]") n eTerm
         unwrapLs (I "null") n eTerm = unwrapLs (I "[]") n eTerm
@@ -114,13 +113,17 @@ evalS (A (L name sexpr) arg) = do
   -- TODO FIGURE OUT WHERE TO HANDLE FRAMES
   -- Change this to closures instead of frames
   -- DOES THIS HANDLE EVERY CASE???
-  modify (setVar name eArg [] :)
-  eSexpr <- evalS sexpr
-  case eSexpr of
-    a@(L _ _) -> return a 
-    a@_ -> do
-      modify tail
-      return a
+  frame <- get
+  case getVarSafe name frame of 
+    (I "null") -> do
+      modify (setVar name eArg)
+      evalS sexpr
+    var -> do
+      modify (setVar name eArg)
+      eS <- evalS sexpr
+      modify (setVar name var)
+      return eS
+  
 
 evalS (A (A (A (I "~if") cond) x) y) = do
   evalS (AB (AB (AB (I "if") cond) x) y)
@@ -202,7 +205,7 @@ evalS (AB x y) = do
 evalS x = return x
 
 -- Run the state of the eval
-eval x = runStateT (evalS x) [[]]
+eval x = runStateT (evalS x) []
 
 
 -- Comparision Helper
@@ -215,23 +218,17 @@ comparisonHelper func x y =
 
 --Variable Type Frame Helpers
 getVar name [] = error ("Undefined variable: "++ show name)
-getVar name (f:fs) = getVarHelper name f fs
-  where getVarHelper name [] [] = error ("Undefined variable: "++ show name)
-        getVarHelper name [] (r:rest) = getVarHelper name r rest
-        getVarHelper name (f:fs) rest = 
-          if (fst f) == name 
-            then snd f 
-            else getVarHelper name fs rest
+getVar name (f:fs) = 
+  if (fst f)==name
+    then (snd f)
+    else getVar name fs
 
 
 getVarSafe name [] = (I "null")
-getVarSafe name (f:fs) = getVarHelper name f fs
-  where getVarHelper name [] [] = (I "null")
-        getVarHelper name [] (r:rest) = getVarHelper name r rest
-        getVarHelper name (f:fs) rest = 
-          if (fst f) == name 
-            then snd f 
-            else getVarHelper name fs rest
+getVarSafe name (f:fs) = 
+  if (fst f)==name
+    then (snd f)
+    else getVarSafe name fs 
 
 setVar name val [] = [(name,val)]
 setVar name val (x:xs) = 

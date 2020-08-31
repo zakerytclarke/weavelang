@@ -1,7 +1,5 @@
-x:=[];
-for(i,[0:10]){
-  print(i);
-  x[i]:=i;
-  print(x);
+for(i,[0:10]) {
+  for(j,[0:10]) {
+    print(i + j);
+  }
 }
-print(x);

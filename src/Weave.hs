@@ -31,9 +31,9 @@ main = do
       case ast of
         [] -> (error "Unable to parse program")
         ast -> do--Parsed Correctly
-                putStrLn $ show ast
+                --putStrLn $ show ast
                 let trans = (transform ast)
-                putStrLn $ show trans
+                --putStrLn $ show trans
                 --eval optimized []
                 let typeChecked = (typeCheck trans defaultTypes)
                 putStrLn "\nTypes:"
@@ -41,7 +41,7 @@ main = do
                 putStrLn $ prettyPrintFrame (snd (snd typeChecked))
                 let simplified = (transformEval trans)
                 let simp = show simplified
-                if (length simp)<=200
+                if (length simp)<=500
                   then do
                     putStrLn "Simplified λ Calculus:"
                     putStrLn "============================"

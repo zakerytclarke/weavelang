@@ -11,8 +11,8 @@ print("");
 input("Press Enter to Continue");
 print("Features");
 print("====================");
-print("- C Style Syntax that translates to a functional representation");
-print("- Strong type inference");
+print("- Compiles imperative style coding => efficient functional lambda calculus");
+print("- Type Inference and strong type checking");
 input("Press Enter to Continue");
 print("Code Examples:");
 print("====================");
@@ -20,17 +20,28 @@ print("====================");
 print("Hello World!:");
 print("====================");
 print("print('hello world!');");
+print("");
+print("Result:");
+print("====================");
 print('hello world!');
 print("");
 input("Press Enter to Continue");
 
 print("Count to 10:");
 print("====================");
-print("for(i,[1:10]){");
+print("for(i,[0:10]){");
 print("  print(i);");
 print("  a[i]=i;");
 print("}");
-
+print("print(a);");
+print("");
+print("Result:");
+print("====================");
+for(i,[0:10]){
+  print(i);
+  a[i]:=i;
+}
+print(a);
 print("");
 input("Press Enter to Continue");
 
@@ -44,6 +55,9 @@ print("   return n*factorial(n-1);");
 print("  }");
 print("}");
 print("print(factorial(10));");
+print("");
+print("Result:");
+print("====================");
 factorial:=(n){
   if(n<=1){
     return 1;
@@ -67,6 +81,9 @@ print("  }");
 print("  return fib(n-1) + fib(n-2)");
 print("}");
 print("print(fib(8));");
+print("");
+print("Result:");
+print("====================");
 fib:=(n){
   if(n==0){
     return 0;
@@ -90,3 +107,12 @@ print("- Liquid typing; eg a>=0");
 print("- Monad implementation for better IO abstraction");
 print("- Recursion analysis");
 print("- Better error handling");
+print("");
+print("To run other sample programs, type './weave ./sample_programs/name.wv");
+print("Example Programs:");
+print("====================");
+print("./weave ./sample_programs/fizzbuzz.wv");
+print("./weave ./sample_programs/factorial.wv");
+print("./weave ./sample_programs/fibonacci.wv");
+print("./weave ./sample_programs/lists.wv");
+print("./weave ./sample_programs/for.wv");
