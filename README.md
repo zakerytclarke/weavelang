@@ -8,7 +8,7 @@ Studying Computer Science at the University of New Mexico
 
 
 Welcome to Weave Programming Language!
-Weave is a programming language that transforms imperative style code into efficient functional code. Programming in functional languages is incredibley powerful- offering unmatched expressiveness and program safety. However, programming in a functional style can often be a daunting task.
+Weave is a programming language that transforms imperative style code into efficient functional code. Programming in functional languages is incredibly powerful- offering unmatched expressiveness and program safety. However, programming in a functional style can often be a daunting task.
 
 We have created the Weave programming language to allow C-like programs that take advantage of the flexibility, efficiency and safety of functional languages.
 

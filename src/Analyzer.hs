@@ -177,7 +177,8 @@ typeCheckState (EvalFor (Variable varName) (Number start) (Number end) term rest
 typeCheckState a@(Pair x y) = do 
   fstType <- typeCheckState x
   expectedTypes (tList a) (take (length (tList a)) $ repeat fstType) "[]" (List fstType)
-  where tList (Pair a EmptyList) = [a]
+  where tList b@(Variable a) = []
+        tList (Pair a EmptyList) = [a]
         tList (Pair a b) =  a:(tList b)
        
 typeCheckState (Append x y) = do
