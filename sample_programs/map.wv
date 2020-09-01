@@ -1,0 +1,14 @@
+map:=(f,ls){
+  if(length(ls)==0){
+    return [];
+  }else{
+    f(head(ls)):map(tail(ls));
+  }
+}
+
+add1:=(n){
+  return n+1;
+}
+
+print(map(add1,[1,2,3]));
+
