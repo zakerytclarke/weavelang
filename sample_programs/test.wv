@@ -1,15 +1,5 @@
-scale:=(n) {
-  return n * 5;
-}
+print((a) {
+  return a;
+}(10));
 
-map:=(f,ls) {
-  if (ls != []) {
-    return (f(head(ls))) : (map(f, (tail(ls))));
-  }
-
-  return [];
-}
-
-x:=[1,2,3];
-
-print(map(scale, x));
+a[0]();

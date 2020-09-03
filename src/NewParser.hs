@@ -35,6 +35,7 @@ data Expression = Const Const
   | Negate Expression
   | App Expression [Expression]
   | Pair Expression Expression
+  | Annon [Expression] [Statements]
   | EmptyList
   deriving (Eq)
 
@@ -148,6 +149,11 @@ operatorTable =
 variable :: Parser Expression
 variable = Var <$> (pack <$> lexeme ((:) <$> letterChar <*> many alphaNumChar))
 
+annonFunction :: Parser Expression
+annonFunction = Annon 
+  <$> parens (expression `sepBy` (symbol ",")) 
+  <*> braces (many statement)
+
 functionCall :: Parser Expression
 functionCall = App <$> variable <*> parens (expression `sepBy` (symbol ","))
 
@@ -175,6 +181,7 @@ term :: Parser Expression
 term = choice 
   [ parens expression
   , constant
+  , try annonFunction
   , try functionCall
   , try arrayAccess
   , variable
