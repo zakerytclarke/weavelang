@@ -48,12 +48,12 @@ main = do
                 --putStrLn "============================"
                 --putStrLn $ prettyPrintFrame (snd (snd typeChecked))
                 --let simplified = (transformEval trans)
-                let simp = prettyPrintStatementTrans trans
+                let simp = (show trans)
                 if (length simp)<=500
                   then do
-                    putStrLn "Simplified λ Calculus:"
-                    putStrLn "============================"
-                    putStrLn simp
+                    --putStrLn "Simplified λ Calculus:"
+                    --putStrLn "============================"
+                    --putStrLn simp
                     putStrLn "\nRun Program:"
                     putStrLn "============================"
                     eval trans

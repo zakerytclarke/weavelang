@@ -117,7 +117,10 @@ evalS (AppT (BuiltInT "length") x) = do
   return (ConstT (CInt (unwrapLs eX)))
   where unwrapLs NullT = 0
         unwrapLs (AppT (AppT (BuiltInT "pair") x) y) = (unwrapLs y) + 1
-evalS a@(AppT (AppT (BuiltInT "pair") x) y) = walkLs a
+evalS a@(AppT (AppT (BuiltInT "pair") x) y) = do
+  eX <- evalS x
+  eY <- evalS y
+  walkLs (AppT (AppT (BuiltInT "pair") eX) eY)
   where walkLs (AppT (AppT (BuiltInT "pair") x) y@(VarT _)) = do
           eY <- evalS y
           return $ (AppT (AppT (BuiltInT "pair") x) eY)

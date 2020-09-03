@@ -257,5 +257,5 @@ parseFile file = do
 
 parseTestFile :: IO [Statement]
 parseTestFile = do
-  contents <- readFile "./sample_programs/test.wv"
+  contents <- readFile "../sample_programs/test.wv"
   return $ parseProgram (pack contents)
