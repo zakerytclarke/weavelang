@@ -29,17 +29,25 @@ instance Show Const where
 
 data Expression = Const Const
   | Variable Text
-  | ArrayAccess Expression [Expression]
-  | BinaryOp Text Expression Expression
-  | Not Expression 
-  | Negate Expression
-  | Application Expression [Expression]
-  | Pair Expression Expression
-  | Annon [Expression] [Statement]
+  | ArrayAccess WrappedExpression [WrappedExpression]
+  | BinaryOp Text WrappedExpression WrappedExpression
+  | Not WrappedExpression 
+  | Negate WrappedExpression
+  | Application WrappedExpression [WrappedExpression]
+  | Pair WrappedExpression WrappedExpression
+  | Annon [WrappedExpression] [WrappedStatement]
   | EmptyList
-  deriving (Eq)
+  deriving (Show,Eq)
 
 
+data WrappedExpression = WrappedExpression SourcePos Expression
+  | WrappedBinaryOp SourcePos Text WrappedExpression WrappedExpression 
+  | WrappedNegate SourcePos WrappedExpression
+  | WrappedNot SourcePos WrappedExpression
+  deriving (Show,Eq)
+
+-- TODO FIX THIS
+{-
 instance Show Expression where
   show (Const const) = show const
   show (Variable a) = unpack a
@@ -66,13 +74,17 @@ showStringHelper (Pair a b) = show a ++ showStringHelper b
 showPairHelper (Pair a EmptyList) = show a
 showPairHelper (Pair a b) = show a ++ "," ++ showPairHelper b
 
-data Statement = If Expression [Statement] [Statement]
-  | For Expression Expression Expression [Statement]
-  | Return Expression
-  | ExpressionStatement Expression
-  | VariableAssignment [Expression] Expression
-  | FunctionAssignment Expression [Expression] [Statement]
+-}
+
+data Statement = If WrappedExpression [WrappedStatement] [WrappedStatement]
+  | For WrappedExpression WrappedExpression WrappedExpression [WrappedStatement]
+  | Return WrappedExpression
+  | ExpressionStatement WrappedExpression
+  | VariableAssignment [WrappedExpression] WrappedExpression
+  | FunctionAssignment WrappedExpression [WrappedExpression] [WrappedStatement]
   deriving (Show,Eq)
+
+data WrappedStatement = WrappedStatement SourcePos Statement deriving (Show,Eq)
 
 spaceConsumer :: Parser ()
 spaceConsumer = L.space
@@ -99,7 +111,7 @@ charLiteral :: Parser Char
 charLiteral = between (char '\'') (char '\'') L.charLiteral
 
 stringLiteral :: Parser String
-stringLiteral = char '\"' *> manyTill L.charLiteral (char '\"')
+stringLiteral = (char '\"' *> manyTill L.charLiteral (char '\"')) <|> (char '\'' *> manyTill L.charLiteral (char '\''))
 
 integer :: Parser Integer
 integer = lexeme L.decimal
@@ -117,67 +129,67 @@ boolean :: Parser Bool
 boolean = do { symbol "True"; return True; }
   <|> do { symbol "False"; return False; }
 
-operatorTable :: [[Operator Parser Expression]]
+operatorTable :: [[Operator Parser WrappedExpression]]
 operatorTable = 
-  [ [ Prefix (Negate <$ symbol "-") 
-    , Prefix (Not <$ symbol "!")
+  [ [ Prefix (WrappedNegate <$> getSourcePos <* symbol "-")
+    , Prefix (WrappedNot <$> getSourcePos <* symbol "!")
     ]
-  , [ InfixL (BinaryOp <$> symbol "^") ]
-  , [ InfixL (BinaryOp <$> symbol "++")
-    , InfixR (BinaryOp <$> symbol ":")
+  , [ InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "^") ]
+  , [ InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "++")
+    , InfixR (WrappedBinaryOp <$> getSourcePos <*> symbol ":")
     ]
-  , [ InfixL (BinaryOp <$> symbol "*")
-    , InfixL (BinaryOp <$> symbol "/")
-    , InfixL (BinaryOp <$> symbol "%")
+  , [ InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "*")
+    , InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "/")
+    , InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "%")
     ]
-  , [ InfixL (BinaryOp <$> symbol "+")
-    , InfixL (BinaryOp <$> symbol "-")
+  , [ InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "+")
+    , InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "-")
     ]
-  , [ InfixL (BinaryOp <$> symbol "<=")
-    , InfixL (BinaryOp <$> symbol ">=")
-    , InfixL (BinaryOp <$> symbol "<")
-    , InfixL (BinaryOp <$> symbol ">")
+  , [ InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "<=")
+    , InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol ">=")
+    , InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "<")
+    , InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol ">")
     ]
-  , [ InfixL (BinaryOp <$> symbol "==")
-    , InfixL (BinaryOp <$> symbol "!=")
+  , [ InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "==")
+    , InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "!=")
     ]
-  , [ InfixL (BinaryOp <$> symbol "&&") ]
-  , [ InfixL (BinaryOp <$> symbol "||") ]
-  , [ InfixR (BinaryOp <$> symbol ":=") ]
+  , [ InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "&&") ]
+  , [ InfixL (WrappedBinaryOp <$> getSourcePos <*> symbol "||") ]
   ]
 
-variable :: Parser Expression
-variable = Variable <$> (pack <$> lexeme ((:) <$> letterChar <*> many alphaNumChar))
+variable :: Parser WrappedExpression
+variable = WrappedExpression <$> getSourcePos <*> (Variable <$> (pack <$> lexeme ((:) <$> letterChar <*> many alphaNumChar)))
 
-annonFunction :: Parser Expression
-annonFunction = Annon 
+annonFunction :: Parser WrappedExpression
+annonFunction = WrappedExpression <$> getSourcePos <*> (Annon 
   <$> parens (expression `sepBy` (symbol ",")) 
-  <*> braces (many statement)
+  <*> braces (many statement))
 
-functionCall :: Parser Expression
-functionCall = Application <$> variable <*> parens (expression `sepBy` (symbol ","))
+functionCall :: Parser WrappedExpression
+functionCall = WrappedExpression <$> getSourcePos <*> (Application <$> variable <*> parens (expression `sepBy` (symbol ",")))
 
-arrayAccess :: Parser Expression
-arrayAccess = ArrayAccess <$> variable <*> some (brackets expression)
+arrayAccess :: Parser WrappedExpression
+arrayAccess = WrappedExpression <$> getSourcePos <*> (ArrayAccess <$> variable <*> some (brackets expression))
 
-listLiteral :: Parser Expression
+listLiteral :: Parser WrappedExpression
 listLiteral = do
+  pos <- getSourcePos
   as <- brackets (expression `sepBy` (symbol ","))
-  return $ mkList as
+  return $ (mkList as pos)
 
-mkList :: [Expression] -> Expression
-mkList [] = EmptyList
-mkList (x:xs) = Pair x (mkList xs)
+mkList :: [WrappedExpression] -> SourcePos -> WrappedExpression
+mkList [] pos = WrappedExpression pos EmptyList
+mkList (x:xs) pos = WrappedExpression pos (Pair x (mkList xs pos))
 
-constant :: Parser Expression
-constant = Const <$> 
+constant :: Parser WrappedExpression
+constant = WrappedExpression <$> getSourcePos <*> (Const <$> 
   ( (CBool <$> boolean)
     <|> (CInt <$> signedInteger)
     <|> (CFloat <$> signedFloat)
-    <|> (CChar <$> charLiteral)
-    <|> (CString <$> stringLiteral))
+    <|> try (CChar <$> charLiteral)
+    <|> (CString <$> stringLiteral)))
 
-term :: Parser Expression
+term :: Parser WrappedExpression
 term = choice 
   [ parens expression
   , constant
@@ -188,25 +200,27 @@ term = choice
   , listLiteral
   ]
 
-expression :: Parser Expression
+expression :: Parser WrappedExpression
 expression = makeExprParser term operatorTable
 
-statement :: Parser Statement
+statement :: Parser WrappedStatement
 statement = ifStatement 
   <|> forStatement 
   <|> returnStatement 
   <|> assignmentStatement
   <|> expressionStatement
 
-ifStatement = If 
+ifStatement :: Parser WrappedStatement
+ifStatement = WrappedStatement <$> getSourcePos <*> (If
   <$ symbol "if" 
   <*> parens expression 
   <*> braces (many statement)
   <*> (try (symbol "else" *> notFollowedBy (symbol "if") *> braces (many statement))
       <|> (symbol "else" *> (do { s <- ifStatement; return $ [s] }))
-      <|> (return []))
+      <|> (return [])))
 
 forStatement = do
+  pos <- getSourcePos
   symbol "for"
   symbol "("
   a <- variable
@@ -218,51 +232,51 @@ forStatement = do
   symbol "]"
   symbol ")"
   d <- braces (many statement)
-  return $ For a b c d
+  return $ WrappedStatement pos (For a b c d)
 
-returnStatement = Return 
+returnStatement = WrappedStatement <$> getSourcePos <*> (Return 
   <$ symbol "return"
   <*> expression 
-  <* symbol ";"
+  <* symbol ";")
 
-expressionStatement = ExpressionStatement 
+expressionStatement = WrappedStatement <$> getSourcePos <*> (ExpressionStatement 
   <$> expression
-  <* symbol ";"
+  <* symbol ";")
 
 assignmentStatement = try functionAssignment <|> try variableAssignment <|> try arrayAssignment
 
-variableAssignment = VariableAssignment
+variableAssignment = WrappedStatement <$> getSourcePos <*> (VariableAssignment
   <$> (do { a <- variable; return [a]; })
   <* symbol ":="
   <*> expression
-  <* symbol ";"
+  <* symbol ";")
 
-functionAssignment = FunctionAssignment
+functionAssignment = WrappedStatement <$> getSourcePos <*> (FunctionAssignment
   <$> variable
   <* symbol ":="
   <*> parens (variable `sepBy` (symbol ","))
-  <*> braces (many statement)
+  <*> braces (many statement))
 
-arrayAssignment = VariableAssignment
+arrayAssignment = WrappedStatement <$> getSourcePos <*> (VariableAssignment
   <$> (do { a <- variable; as <- many (brackets expression); return (a : as); })
   <* symbol ":="
   <*> expression
-  <* symbol ";"
+  <* symbol ";")
 
-program :: Parser [Statement]
+program :: Parser [WrappedStatement]
 program = spaceConsumer >> many statement
 
-parseProgram :: Text -> [Statement]
+parseProgram :: Text -> [WrappedStatement]
 parseProgram a = case parse program "" a of
   Left err -> error (errorBundlePretty err)
   Right a -> a
 
-parseFile :: String -> IO [Statement]
+parseFile :: String -> IO [WrappedStatement]
 parseFile file = do
   contents <- readFile file
   return $ parseProgram (pack contents)
 
-parseTestFile :: IO [Statement]
+parseTestFile :: IO [WrappedStatement]
 parseTestFile = do
   contents <- readFile "../sample_programs/test.wv"
   return $ parseProgram (pack contents)
