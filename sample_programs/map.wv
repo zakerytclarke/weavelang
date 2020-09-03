@@ -1,14 +1,15 @@
-map:=(f,ls){
-  if(length(ls)==0){
-    return [];
-  }else{
-    f(head(ls)):map(tail(ls));
+scale:=(n) {
+  return n * 5;
+}
+
+map:=(f,ls) {
+  if (ls != []) {
+    return (f(head(ls))) : (map(f, (tail(ls))));
   }
+
+  return [];
 }
 
-add1:=(n){
-  return n+1;
-}
+x:=[1,2,3];
 
-print(map(add1,[1,2,3]));
-
+print(map(scale, x));

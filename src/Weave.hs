@@ -1,10 +1,14 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 import System.Environment   
 import Data.List  
 import Control.Monad.IO.Class
 
+import Data.Text (Text,pack,unpack, append)
+
 import Parser
-import Analyzer
-import Runtime
+import Transform
+import Eval
 {-
  -                                               
  - ||   / |  / /                                  
@@ -27,32 +31,32 @@ main = do
     then fail "Please specify a single file as an argument to run your program"
     else do
       prgmTxt <- (readFile (head args))
-      let ast = (parsePrgm prgmTxt)
+      let ast = (parseProgram (pack prgmTxt))
       case ast of
-        [] -> (error "Unable to parse program")
+        [] -> error ("Could not parse program")
         ast -> do--Parsed Correctly
                 --putStrLn $ show ast
                 let trans = (transform ast)
                 --putStrLn $ show trans
                 --eval optimized []
-                let typeChecked = (typeCheck trans defaultTypes)
-                putStrLn "\nTypes:"
-                putStrLn "============================"
-                putStrLn $ prettyPrintFrame (snd (snd typeChecked))
-                let simplified = (transformEval trans)
-                let simp = show simplified
+                --let typeChecked = (typeCheck trans defaultTypes)
+                --putStrLn "\nTypes:"
+                --putStrLn "============================"
+                --putStrLn $ prettyPrintFrame (snd (snd typeChecked))
+                --let simplified = (transformEval trans)
+                let simp = (show trans)
                 if (length simp)<=500
                   then do
-                    putStrLn "Simplified λ Calculus:"
-                    putStrLn "============================"
-                    putStrLn simp
+                    --putStrLn "Simplified λ Calculus:"
+                    --putStrLn "============================"
+                    --putStrLn simp
                     putStrLn "\nRun Program:"
                     putStrLn "============================"
-                    eval simplified
+                    eval trans
                   else do
                     putStrLn "\nRun Program:"
                     putStrLn "============================"
-                    eval simplified
+                    eval trans
 
 
                 
@@ -62,7 +66,8 @@ prettyPrintFrame ((n,t):xs) = if n=="_"
                                 then (prettyPrintFrame xs) 
                                 else (n++": "++(show t)++"\n"++(prettyPrintFrame xs))
   
-
+{-
 defaultTypes = ("_",
   [ ("input",(Func (List Character) (List Character))),
     ("print",(Func (List Character) IO)) ])
+-}

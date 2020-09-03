@@ -1,244 +1,268 @@
-module Parser (parsePrgm,Term(..),Type(..),EvalTerm(..)) where
+{-# LANGUAGE OverloadedStrings #-}
 
-import Parselib
-import Data.Char
+module Parser (Expression(..),Const(..),Statement(..),parseTestFile,parseFile,parseProgram) where 
 
+import Data.Text (Text,pack,unpack)
+import Data.Void
 
-data Type =  Boolean | Int | Numeric | Character | Func Type Type | Unknown | UnknownArg String | List Type | IO deriving(Eq)
+import Control.Monad.Combinators.Expr
 
-instance Show Type where
-  show Boolean = "Bool"
-  show Numeric = "Num"
-  show Character = "Char"
-  show f@(Func x y) = "(" ++ showFuncHelper f ++ ")"
-  show Unknown = "Unknown"
-  show (UnknownArg a) = "UnknownArg " ++ show a
-  show (List Character) = "String"
-  show (List a) = "List " ++ show a
-  show IO = "IO"
+import Text.Megaparsec
+import Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer as L
 
-showFuncHelper (Func x y) = showFuncHelper x ++ "->" ++ showFuncHelper y
-showFuncHelper y = show y
+type Parser = Parsec Void Text
 
-data Term = FunctionDef [String] [Term] 
-  | Tru 
-  | Fls 
-  | Null 
+data Const = CInt Integer
+  | CBool Bool
+  | CChar Char
+  | CFloat Double 
+  | CString String
+  deriving (Eq)
+
+instance Show Const where
+  show (CInt a) = show a
+  show (CChar c) = show c
+  show (CBool c) = show c
+  show (CFloat f) = show f
+  show (CString s) = s
+
+data Expression = Const Const
+  | Variable Text
+  | ArrayAccess Expression [Expression]
+  | BinaryOp Text Expression Expression
+  | Not Expression 
+  | Negate Expression
+  | Application Expression [Expression]
+  | Pair Expression Expression
+  | Annon [Expression] [Statement]
   | EmptyList
-  | Char Float 
-  | Number Float 
-  | Variable String 
-  | VariableArr String Term
-  | Addition Term Term 
-  | Subtraction Term Term 
-  | Multiplication Term Term 
-  | Division Term Term 
-  | Exponentiation Term Term
-  | Mod Term Term
-  | Not Term 
-  | And Term Term 
-  | Or Term Term 
-  | NotEquals Term Term
-  | Equals Term Term 
-  | GreaterThan Term Term 
-  | GreaterThanEqual Term Term 
-  | LessThanEqual Term Term  
-  | LessThan Term Term 
-  | Pair Term Term 
-  | Append Term Term 
-  | Head Term
-  | Tail Term 
-  | Map Term Term 
-  | Assignment String Term 
-  | AssignmentArr String Term Term 
-  | FunctionCall String [Term] 
-  | Lambda String Term 
-  | App Term [Term] 
-  | FuncPtr String 
-  | Return Term 
-  | If Term [Term] [Term] 
-  | EvalIf Term Term Term 
-  | For String Term Term [Term]
-  | EvalFor Term Term Term Term Term deriving(Show,Eq,Ord)
-
-{-
-instance Show Term where
-  show Null = ""
-  show (Char num) = [chr $ round num]
-  show (Pair x y) = (show x)++(show y)
--}
+  deriving (Eq)
 
 
---Evaluation Type
-data EvalTerm = L String EvalTerm --Lambda Abstraction
-  | A EvalTerm EvalTerm  --Application
-  | AB EvalTerm EvalTerm --Built in Function 
-  | I String --Variable & Function references
-  | N Float --Number 
-  | C Float --Character
-  | B Float deriving(Eq) -- Boolean
+instance Show Expression where
+  show (Const const) = show const
+  show (Variable a) = unpack a
+  show (BinaryOp op a b) = show a ++ unpack op ++ show b
+  show (Not a) = "!" ++ show a
+  show (Negate a) = "-" ++ show a
+  show p@(Pair (Const (CChar a)) b) = showStringHelper p
+  show p@(Pair a b) = "[" ++ showPairHelper p ++ "]"
+  show (Application a as) = show a ++ "(" ++ showExpressionListHelper as ++ ")"
+  show (ArrayAccess a as) = show a ++ showArrayAccessHelper as
+  show EmptyList = ""
 
 
-instance Show EvalTerm where
-  show (L s t) = "(λ"++s++". "++(show t)++") "
-  show p@(AB (AB (I "pair") (C x)) y) = showStringHelper p
-  show p@(AB (AB (I "pair") x) y) = "["++(showPairHelper p) ++ "]"
-  show (I "null") = ""
-  show (I "[]") = ""
-  show (A (I n) a) = show (I n)++" "++(show a)
-  show (A s a) = "("++show s++")"++(show a)
-  show (I ('~':name)) = name
-  show (I name) = name
-  show (C 0) = ""
-  show (C a) = [chr (round a)]
-  show (N a) = show a
-  show (B 0) = "F"
-  show (B 1) = "T"
-  show (B (-1)) = ""
+showArrayAccessHelper [x] = "[" ++ show x ++ "]"
+showArrayAccessHelper (x:xs) = "[" ++ show x ++ "]" ++ showArrayAccessHelper xs
 
+showExpressionListHelper [x] = show x
+showExpressionListHelper (x:xs) = show x ++ ", " ++ showExpressionListHelper xs
 
-showStringHelper (AB (AB (I "pair") x) (B (-1))) = show x
-showStringHelper (AB (AB (I "pair") x) y) = show x ++ showStringHelper y
-showStringHelper y = show y
+showStringHelper (Pair (Const (CChar a)) EmptyList) = [a]
+showStringHelper (Pair (Const (CChar a)) b) = [a] ++ showStringHelper b
+showStringHelper (Pair a b) = show a ++ showStringHelper b
 
-showPairHelper :: EvalTerm -> String
-showPairHelper (AB (AB (I "pair") x) (I "[]")) = show x
-showPairHelper (AB (AB (I "pair") x) (B (-1))) = show x
-showPairHelper (AB (AB (I "pair") (I "[]")) _) = "..."
-showPairHelper (AB (AB (I "pair") x) y) = (show x) ++ ", " ++ (showPairHelper y)
-showPairHelper y = show y
+showPairHelper (Pair a EmptyList) = show a
+showPairHelper (Pair a b) = show a ++ "," ++ showPairHelper b
 
+data Statement = If Expression [Statement] [Statement]
+  | For Expression Expression Expression [Statement]
+  | Return Expression
+  | ExpressionStatement Expression
+  | VariableAssignment [Expression] Expression
+  | FunctionAssignment Expression [Expression] [Statement]
+  deriving (Show,Eq)
 
-prgm :: Parser [Term]
-prgm = space >> (many statement)
+spaceConsumer :: Parser ()
+spaceConsumer = L.space
+  space1
+  (L.skipLineComment "//")
+  (L.skipBlockComment "/*" "*/")
 
-statement :: Parser Term
-statement = 
-  --Return Statement
-  do {symb "return"; space; a <- expr; space; symb ";"; return (Return a)}
-  +++
-  --Function Declaration
-  do {var<-variableName; space; symb ":="; space; symb "("; args <- variableList; symb ")"; space; symb "{"; space; ss <- (many statement); symb "}"; return (Assignment var (FunctionDef args ss))}
-  +++
-  ifStatementParser
-  +++
-  --For Statement
-  do {symb "for"; space; symb "("; space; var <- variableName; space; symb ","; symb "["; start <- number; space; symb ":"; end <- number; space; symb "]";  space; symb ")"; space; symb "{"; space; ss <- (many statement); symb "}"; return (For var (Number start) (Number end) ss)}
-  +++
-  --Variable Array Assignment
-  do {var<-variableName; space; symb "["; space; index <- expr ;symb "]"; space; symb ":="; e <- expr; symb ";"; return (AssignmentArr var index e)}
-  +++
-  --Variable Assignment
-  do {var<-variableName; space; symb ":="; e <- expr; symb ";"; return (Assignment var e)}
-  +++  
-  ---Expression do
-  do {e <- expr; symb ";"; return (Assignment "_" e)}--Assign return value to nothing
+lexeme :: Parser a -> Parser a
+lexeme = L.lexeme spaceConsumer
 
-ifStatementParser :: Parser Term
-ifStatementParser = do {symb "if"; space; symb "("; test <- expr; symb ")"; space; symb "{"; space; ss <- (many statement); symb "}"; space; symb "else"; symb "{"; space; ss2 <- (many statement); symb "}";space; return (If test ss ss2)} 
-  +++ do {symb "if"; space; symb "("; test <- expr; symb ")"; space; symb "{"; space; ss <- (many statement); symb "}"; space; symb "else"; ss2 <- ifStatementParser; space; return (If test ss [ss2])} 
-  +++ do {symb "if"; space; symb "("; test <- expr; symb ")"; space; symb "{"; space; ss <- (many statement); symb "}"; return (If test ss [])}
+symbol :: Text -> Parser Text
+symbol = L.symbol spaceConsumer
 
-exprList :: Parser [Term]
-exprList = sepby expr (symb ",")
+parens :: Parser a -> Parser a
+parens = between (symbol "(") (symbol ")")
 
-expr = logicalOr
+brackets :: Parser a -> Parser a
+brackets = between (symbol "[") (symbol "]")
 
-logicalOr = chainl1 logicalAnd op
-  where op = do { space; symb "||"; return Or }
+braces :: Parser a -> Parser a
+braces = between (symbol "{") (symbol "}")
 
-logicalAnd = chainl1 equality op
-  where op = do { space; symb "&&"; return And }
+charLiteral :: Parser Char
+charLiteral = between (char '\'') (char '\'') L.charLiteral
 
-equality = chainl1 relational op
-  where op = do { space; symb "=="; return Equals }
-            +++ do { space; symb "!="; return NotEquals }
+stringLiteral :: Parser String
+stringLiteral = char '\"' *> manyTill L.charLiteral (char '\"')
 
-relational = chainl1 addy op
-  where op = do { space; symb ">="; return $ GreaterThanEqual }
-          +++ do { space; symb "<="; return $ LessThanEqual }
-          +++ do { space; symb ">"; return $ GreaterThan }
-          +++ do { space; symb "<"; return $ LessThan }
+integer :: Parser Integer
+integer = lexeme L.decimal
 
-addy = chainl1 multy op
-  where op = do { space; symb "+"; return $ Addition } 
-            +++ do { space; symb "-"; return $ Subtraction }
+float :: Parser Double
+float = lexeme L.float
 
-multy = chainl1 expy op
-  where op = do { space; symb "*"; return $ Multiplication } 
-            +++ do { space; symb "/"; return $ Division }
-            +++ do { space; symb "%"; return $ Mod }
+signedInteger :: Parser Integer
+signedInteger = L.signed (return ()) integer
 
-expy = chainl1 stry op
-  where op = do { space; symb "^"; return $ Exponentiation }
+signedFloat :: Parser Double
+signedFloat = L.signed (return ()) float
 
-stry = chainl1 cons op
-  where op = do { space; symb "++"; return $ Append }
+boolean :: Parser Bool
+boolean = do { symbol "True"; return True; }
+  <|> do { symbol "False"; return False; }
 
-cons = chainr1 noty op
-  where op = do { space; symb ":"; return $ Pair }
+operatorTable :: [[Operator Parser Expression]]
+operatorTable = 
+  [ [ Prefix (Negate <$ symbol "-") 
+    , Prefix (Not <$ symbol "!")
+    ]
+  , [ InfixL (BinaryOp <$> symbol "^") ]
+  , [ InfixL (BinaryOp <$> symbol "++")
+    , InfixR (BinaryOp <$> symbol ":")
+    ]
+  , [ InfixL (BinaryOp <$> symbol "*")
+    , InfixL (BinaryOp <$> symbol "/")
+    , InfixL (BinaryOp <$> symbol "%")
+    ]
+  , [ InfixL (BinaryOp <$> symbol "+")
+    , InfixL (BinaryOp <$> symbol "-")
+    ]
+  , [ InfixL (BinaryOp <$> symbol "<=")
+    , InfixL (BinaryOp <$> symbol ">=")
+    , InfixL (BinaryOp <$> symbol "<")
+    , InfixL (BinaryOp <$> symbol ">")
+    ]
+  , [ InfixL (BinaryOp <$> symbol "==")
+    , InfixL (BinaryOp <$> symbol "!=")
+    ]
+  , [ InfixL (BinaryOp <$> symbol "&&") ]
+  , [ InfixL (BinaryOp <$> symbol "||") ]
+  , [ InfixR (BinaryOp <$> symbol ":=") ]
+  ]
 
-noty = do {symb "!"; space; a <- funcCall; return (Not a)}
-  +++ funcCall
+variable :: Parser Expression
+variable = Variable <$> (pack <$> lexeme ((:) <$> letterChar <*> many alphaNumChar))
 
+annonFunction :: Parser Expression
+annonFunction = Annon 
+  <$> parens (expression `sepBy` (symbol ",")) 
+  <*> braces (many statement)
 
-funcCall = do { fName <- variableName; space; symb "("; space; args <- exprList; space; symb ")"; return (FunctionCall fName args) } 
-  +++ do { aName <- variableName; space; symb "["; i <- expr; symb "]"; return (VariableArr aName i) }
-  +++ pareny
+functionCall :: Parser Expression
+functionCall = Application <$> variable <*> parens (expression `sepBy` (symbol ","))
 
-pareny = do {symb "("; a <- expr; symb ")"; return a} +++ value 
+arrayAccess :: Parser Expression
+arrayAccess = ArrayAccess <$> variable <*> some (brackets expression)
 
-value = do { symb "True"; return Tru}+++
-         do { symb "False"; return Fls}+++
-         do {a <- number; return (Number a)} +++ 
-         do { a <- variableName; return (Variable a)}+++
-         listLiteral +++
-         stringLiteral
+listLiteral :: Parser Expression
+listLiteral = do
+  as <- brackets (expression `sepBy` (symbol ","))
+  return $ mkList as
 
-
-variableList = do { a <-variableName; space; symb ","; space; b <- variableList; return ([a]++b)} +++ do {c <- variableName; return [c]}
-
-variableName = do {a<-letter; b<-(many alphanum); return ([a]++b)}+++do{symb "_"; return "_"}
-
-listLiteral = do { space; symb "["; vals <- exprList; symb "]"; return $ mkList vals } 
-  +++ do { space; symb "["; symb "]"; return EmptyList }
-
-stringLiteral = do {space; string "'"; a<-(many stringSymb1); symb "'"; return (mkString (map (\x -> Char (fromIntegral (ord x))) a))}+++
-                do {space; string "\""; a<-(many stringSymb2); symb "\""; return (mkString (map (\x -> Char (fromIntegral (ord x))) a))}
-
-stringSymb1 = do {symb "\\'"; return '\''}+++do{a<-(sat (/='\''));return a}
-stringSymb2 = do {symb "\\\""; return '\"'}+++do{a<-(sat (/='\"'));return a} 
-
-
-number = do {a<-integer; symb "."; b<-integer; return (read ((show a)++"."++(show b)) ::Float)}+++
-         do {a<-integer; return (fromIntegral a)}
-
+mkList :: [Expression] -> Expression
 mkList [] = EmptyList
 mkList (x:xs) = Pair x (mkList xs)
 
+constant :: Parser Expression
+constant = Const <$> 
+  ( (CBool <$> boolean)
+    <|> (CInt <$> signedInteger)
+    <|> (CFloat <$> signedFloat)
+    <|> (CChar <$> charLiteral)
+    <|> (CString <$> stringLiteral))
 
-mkString [] = EmptyList
-mkString (x:xs) = Pair x (mkString xs)
+term :: Parser Expression
+term = choice 
+  [ parens expression
+  , constant
+  , try annonFunction
+  , try functionCall
+  , try arrayAccess
+  , variable
+  , listLiteral
+  ]
 
+expression :: Parser Expression
+expression = makeExprParser term operatorTable
 
-parsePrgm text = 
-  case (parse prgm text) of
-    --Worked Completely; Return AST
-    [(ast,"")] -> ast
-    --Worked Partially
-    [(ast,remainder)] -> 
-      error ("Failed to Parse at "++(show failedRow)++":"++(show failedCol)++"\n"++errorTxt++"\n"++(arrows (length errorTxt)))
-      where failedAt = countNL (reverse (take (length remainder) (reverse text))) 0 0
-            failedRow = fst failedAt
-            failedCol = snd failedAt
-            tLen = length text
-            countNL (t:ts) c tot = if t=='\n'
-                                     then (countNL ts 0 (tot+1))
-                                     else (countNL ts (c+1) tot)
-            countNL [] c tot =  (tot,c)
-            getErrorTxt [] = "" 
-            getErrorTxt ('\n':xs) = ""
-            getErrorTxt (x:xs) = x:(getErrorTxt xs)
-            errorTxt = getErrorTxt remainder
-            arrows 0 = "^"
-            arrows n = "^"++(arrows (n-1))
+statement :: Parser Statement
+statement = ifStatement 
+  <|> forStatement 
+  <|> returnStatement 
+  <|> assignmentStatement
+  <|> expressionStatement
+
+ifStatement = If 
+  <$ symbol "if" 
+  <*> parens expression 
+  <*> braces (many statement)
+  <*> (try (symbol "else" *> notFollowedBy (symbol "if") *> braces (many statement))
+      <|> (symbol "else" *> (do { s <- ifStatement; return $ [s] }))
+      <|> (return []))
+
+forStatement = do
+  symbol "for"
+  symbol "("
+  a <- variable
+  symbol ","
+  symbol "["
+  b <- expression
+  symbol ".."
+  c <- expression
+  symbol "]"
+  symbol ")"
+  d <- braces (many statement)
+  return $ For a b c d
+
+returnStatement = Return 
+  <$ symbol "return"
+  <*> expression 
+  <* symbol ";"
+
+expressionStatement = ExpressionStatement 
+  <$> expression
+  <* symbol ";"
+
+assignmentStatement = try functionAssignment <|> try variableAssignment <|> try arrayAssignment
+
+variableAssignment = VariableAssignment
+  <$> (do { a <- variable; return [a]; })
+  <* symbol ":="
+  <*> expression
+  <* symbol ";"
+
+functionAssignment = FunctionAssignment
+  <$> variable
+  <* symbol ":="
+  <*> parens (variable `sepBy` (symbol ","))
+  <*> braces (many statement)
+
+arrayAssignment = VariableAssignment
+  <$> (do { a <- variable; as <- many (brackets expression); return (a : as); })
+  <* symbol ":="
+  <*> expression
+  <* symbol ";"
+
+program :: Parser [Statement]
+program = spaceConsumer >> many statement
+
+parseProgram :: Text -> [Statement]
+parseProgram a = case parse program "" a of
+  Left err -> error (errorBundlePretty err)
+  Right a -> a
+
+parseFile :: String -> IO [Statement]
+parseFile file = do
+  contents <- readFile file
+  return $ parseProgram (pack contents)
+
+parseTestFile :: IO [Statement]
+parseTestFile = do
+  contents <- readFile "../sample_programs/test.wv"
+  return $ parseProgram (pack contents)
