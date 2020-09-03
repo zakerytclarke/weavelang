@@ -6,11 +6,7 @@ import Control.Monad.IO.Class
 
 import Data.Text (Text,pack,unpack, append)
 
---import Parser
---import Analyzer
---import Runtime
-
-import NewParser
+import Parser
 import Transform
 import Eval
 {-
