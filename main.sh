@@ -1,6 +1,5 @@
 # Build the programming language
-ghc Weave.hs
-rm *.o
-rm *.hi
+cd src && ghc Weave.hs -outputdir build -o weave && mv weave.exe ../weave.exe
+
 # Run a sample program
-./Weave ./sample_programs/welcome.wv
+cd .. && ./weave.exe ./sample_programs/welcome.wv
