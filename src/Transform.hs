@@ -14,7 +14,7 @@ data Term = App Term Term
   deriving (Show,Eq)
 
 getVar name [] = error ("Undefined variable: "++ show name)
-getVar name (f:fs) = 
+getVar name (f:fs) =
   if (fst f)==name
     then (snd f)
     else getVar name fs
@@ -25,7 +25,7 @@ prettyPrintStatementTrans Null = ""
 prettyPrintStatementTrans (Var name) = unpack name
 prettyPrintStatementTrans (BuiltIn a) = unpack a
 prettyPrintStatementTrans (Lambda a sexpr)  = "(l." ++ prettyPrintStatementTrans a ++ " " ++ prettyPrintStatementTrans sexpr ++ ")"
-prettyPrintStatementTrans a@(App (App (BuiltIn "pair") (Value (CChar x))) y) = showStringHelper a 
+prettyPrintStatementTrans a@(App (App (BuiltIn "pair") (Value (CChar x))) y) = showStringHelper a
 prettyPrintStatementTrans a@(App (App (BuiltIn "pair") x) y) = "[" ++ showPairHelper a ++ "]"
 prettyPrintStatementTrans (App sexpr arg) = "(" ++ prettyPrintStatementTrans sexpr ++ " " ++ prettyPrintStatementTrans arg ++ ")"
 {-
@@ -39,12 +39,12 @@ instance Show Term where
   show (App sexpr arg) = "(" ++ show sexpr ++ " " ++ show arg ++ ")"
 -}
 showStringHelper (App (App (BuiltIn "pair") (Value (CChar x))) Null) = [x]
-showStringHelper (App (App (BuiltIn "pair") (Value (CChar x))) y) = [x] ++ showStringHelper y 
-showStringHelper (App (App (BuiltIn "pair") x) y) = prettyPrintStatementTrans x ++ showStringHelper y 
+showStringHelper (App (App (BuiltIn "pair") (Value (CChar x))) y) = [x] ++ showStringHelper y
+showStringHelper (App (App (BuiltIn "pair") x) y) = prettyPrintStatementTrans x ++ showStringHelper y
 
-showPairHelper (App (App (BuiltIn "pair") x) Null) = prettyPrintStatementTrans x 
-showPairHelper (App (App (BuiltIn "pair") Null) y) = "  " ++ "," ++ showPairHelper y 
-showPairHelper (App (App (BuiltIn "pair") x) y) = prettyPrintStatementTrans x ++ "," ++ showPairHelper y 
+showPairHelper (App (App (BuiltIn "pair") x) Null) = prettyPrintStatementTrans x
+showPairHelper (App (App (BuiltIn "pair") Null) y) = "  " ++ "," ++ showPairHelper y
+showPairHelper (App (App (BuiltIn "pair") x) y) = prettyPrintStatementTrans x ++ "," ++ showPairHelper y
 
 nthDim :: Integer -> Text
 nthDim 1 = "1st"
@@ -56,20 +56,20 @@ arrLambda :: Integer -> Text -> Text -> Term -> Term
 arrLambda 0 name func end = (Lambda (Var ("~Arr")) (Lambda (Var func) end))
 arrLambda n name func end = (Lambda (Var (append "~" (nthDim n))) (arrLambda (n - 1) (append (append "~" (nthDim n)) name) func end))
 
-forLoop var start end body rest = 
-  (App 
-    (App 
-      (App 
+forLoop var start end body rest =
+  (App
+    (App
+      (App
         (App
-          (Lambda (Var "~forStart") 
-            (Lambda (Var "~forEnd") 
-              (Lambda (Var "~forVar") 
-                (Lambda (Var "~forBody") 
+          (Lambda (Var "~forStart")
+            (Lambda (Var "~forEnd")
+              (Lambda (Var "~forVar")
+                (Lambda (Var "~forBody")
                   (Lambda (Var "~for") (transform rest))
                 )
               )
             )
-          ) (transformE start) 
+          ) (transformE start)
         ) (transformE end)
       ) (transformE var)
     ) (transform body)
@@ -79,7 +79,7 @@ transformE :: Expression -> Term
 transformE e =
   case e of
     Const (CString str) -> mkStringList str
-    Const c -> Value c 
+    Const c -> Value c
     Variable c -> case c of
       "pair" -> BuiltIn c
       "append" -> BuiltIn c
@@ -114,8 +114,8 @@ transformE e =
 
 transform :: [Statement] -> Term
 transform [] = Null
-transform [s] = 
-  case s of 
+transform [s] =
+  case s of
     If cond b1 b2 -> (App (App (App (BuiltIn "if") (transformE cond)) (transform b1)) (transform b2))
     For e1 e2 e3 body -> forLoop e1 e2 e3 body []
     Return e -> (transformE e)

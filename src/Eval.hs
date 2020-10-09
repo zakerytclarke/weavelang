@@ -91,27 +91,27 @@ evalS (App (App (App (BuiltIn "if") cond) x) y) = do
   if c'
     then evalS x
     else evalS y
-evalS a@(App (App (BuiltIn op) Null) Null) = 
-  case op of 
+evalS a@(App (App (BuiltIn op) Null) Null) =
+  case op of
     "==" -> return $ Value (CBool True)
     "!=" -> return $ Value (CBool False)
-evalS a@(App (App (BuiltIn op) (Value x)) (Value y)) = 
+evalS a@(App (App (BuiltIn op) (Value x)) (Value y)) =
   constHelper op x y
 evalS a@(App (App (BuiltIn op) var@(Var name)) Null) = do
   eVar <- evalS var
-  case op of 
+  case op of
     "==" -> return $ Value (CBool (eVar == Null))
     "!=" -> return $ Value (CBool (eVar /= Null))
 evalS a@(App (App (BuiltIn op) Null) var@(Var name)) = do
   eVar <- evalS var
-  case op of 
+  case op of
     "==" -> return $ Value (CBool (eVar == Null))
     "!=" -> return $ Value (CBool (eVar /= Null))
 -- Look if need to evaluate either x or y
 evalS a@(App (App (BuiltIn "pair") x) y@(Var _)) = do
   eY <- evalS y
   return (App (App (BuiltIn "pair") x) eY)
-evalS a@(App (App (BuiltIn "pair") (App (App (BuiltIn "pair") x) y)) z) = return a 
+evalS a@(App (App (BuiltIn "pair") (App (App (BuiltIn "pair") x) y)) z) = return a
 evalS (App (BuiltIn "length") x) = do
   eX <- evalS x
   return (Value (CInt (unwrapLs eX)))
@@ -215,7 +215,7 @@ lookupVarArr (((Value (CInt var)), name):xs) a@(App (App (BuiltIn "pair") x) y) 
 
 --- GET ALL ARR VARIABLES FROM FRAME "~1st" ...
 getArrVar frame = getArrVarHelper frame 1
-  where getArrVarHelper frame count = 
+  where getArrVarHelper frame count =
           case getVarSafe ("~" `append` (nthDim count)) frame of
             Null -> []
             var -> (var, ("~" `append` (nthDim count)) ) : getArrVarHelper frame (count + 1)
@@ -230,9 +230,9 @@ forLoop [start,end,var,body] rest = do
   case eStart of
     (Value (CInt startInt)) -> do
       eEnd <- evalS end
-      case eEnd of 
+      case eEnd of
         (Value (CInt endInt)) -> do
-          if (startInt < endInt) 
+          if (startInt < endInt)
             then evalS $ forLoopHelper startInt endInt var body rest
             else evalS rest
         _ -> error "For loop end index not an int"
@@ -253,13 +253,13 @@ removeForVar frame = removeForVarHelper ["~forStart", "~forEnd", "~forVar", "~fo
         removeForVarHelper (f:fs) frame = removeForVarHelper fs (removeVar f frame)
 
 getVarSafe name [] = Null
-getVarSafe name (f:fs) = 
+getVarSafe name (f:fs) =
   if (fst f)==name
     then (snd f)
-    else getVarSafe name fs 
+    else getVarSafe name fs
 
 getVar name [] = error ("Undefined variable: "++ show name)
-getVar name (f:fs) = 
+getVar name (f:fs) =
   if (fst f)==name
     then (snd f)
     else getVar name fs
@@ -271,7 +271,7 @@ removeVar name (f:fs) =
     else f : removeVar name fs
 
 setVar name val [] = [(name,val)]
-setVar name val (x:xs) = 
+setVar name val (x:xs) =
   if ((fst x)==name)
     then (name,val) : xs
     else x:(setVar name val xs)
@@ -284,8 +284,8 @@ comparisonHelper func x y =
 
 
 -- TODO add all the types and values
-constHelper op (CInt x) (CInt y) = 
-  case op of 
+constHelper op (CInt x) (CInt y) =
+  case op of
     "<=" -> comparisonHelper (<=) x y
     "==" -> comparisonHelper (==) x y
     "*" -> return (Value (CInt (x * y)))
@@ -293,8 +293,8 @@ constHelper op (CInt x) (CInt y) =
     "+" -> return (Value (CInt (x + y)))
     "%" -> return (Value (CInt (x `mod` y)))
     "/" -> return (Value (CInt (x `div` y)))
-constHelper op (CChar x) (CChar y) = 
-  case op of 
+constHelper op (CChar x) (CChar y) =
+  case op of
     "<=" -> comparisonHelper (<=) x y
     "==" -> comparisonHelper (==) x y
 

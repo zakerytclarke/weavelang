@@ -1,0 +1,17 @@
+getList=
+(lambda (ls,index)
+  (if
+    (= index 0)
+    (head ls)
+    (getList (tail ls) (index-1))
+  )
+)
+
+setList=
+(lambda (ls,index,value)
+  (if
+    (= index 0)
+    value
+    (: (head ls) (setList (tail ls)))
+  )
+)

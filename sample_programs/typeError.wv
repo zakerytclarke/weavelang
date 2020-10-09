@@ -1,0 +1,7 @@
+add:=(n){
+  return 1+n;
+}
+
+x:=add("a");
+
+print(x);

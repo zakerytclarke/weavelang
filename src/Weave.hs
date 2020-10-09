@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import System.Environment   
-import Data.List  
+import System.Environment
+import Data.List
 import Control.Monad.IO.Class
 
 import Data.Text (Text,pack,unpack, append)
@@ -10,12 +10,12 @@ import Parser
 import Transform
 import Eval
 {-
- -                                               
- - ||   / |  / /                                  
- - ||  /  | / /  ___      ___              ___    
- - || / /||/ / //___) ) //   ) ) ||  / / //___) ) 
- - ||/ / |  / //       //   / /  || / / //        
- - |  /  | / ((____   ((___( (   ||/ / ((____     
+ -
+ - ||   / |  / /
+ - ||  /  | / /  ___      ___              ___
+ - || / /||/ / //___) ) //   ) ) ||  / / //___) )
+ - ||/ / |  / //       //   / /  || / / //
+ - |  /  | / ((____   ((___( (   ||/ / ((____
  -
  - Weave Programming Language
  - weave.hs
@@ -23,7 +23,7 @@ import Eval
  - accepts a single filename as an argument
  - that is parsed, analyzed and executed
  -}
-main = do  
+main = do
   putStrLn "Weave Programming Language"
   putStrLn "=============================="
   args <- getArgs --Program path
@@ -59,13 +59,13 @@ main = do
                     eval trans
 
 
-                
+
 
 prettyPrintFrame [] = ""
-prettyPrintFrame ((n,t):xs) = if n=="_" 
-                                then (prettyPrintFrame xs) 
+prettyPrintFrame ((n,t):xs) = if n=="_"
+                                then (prettyPrintFrame xs)
                                 else (n++": "++(show t)++"\n"++(prettyPrintFrame xs))
-  
+
 {-
 defaultTypes = ("_",
   [ ("input",(Func (List Character) (List Character))),

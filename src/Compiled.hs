@@ -13,15 +13,11 @@ import qualified Text.Megaparsec.Char.Lexer as L
 
 type Parser = Parsec Void Text
 
-
-data Type =  Type Text | Func Type Type | Variant [Type] | Record Type [Type] | Unknown  deriving(Show,Eq)
-
 data Const = CInt Integer
   | CBool Bool
   | CChar Char
   | CFloat Double
   | CString String
-  | CTyped Type [Const]
   deriving (Eq)
 
 instance Show Const where
@@ -41,7 +37,6 @@ data Expression = Const Const
   | Pair Expression Expression
   | Annon [Expression] [Statement]
   | EmptyList
-  | TypeExpression Type [Expression]
   deriving (Eq)
 
 
@@ -56,7 +51,6 @@ instance Show Expression where
   show (Application a as) = show a ++ "(" ++ showExpressionListHelper as ++ ")"
   show (ArrayAccess a as) = show a ++ showArrayAccessHelper as
   show EmptyList = ""
-  show (TypeExpression t vs) = (show t) ++ "(" ++ (show vs) ++ ")"
 
 
 showArrayAccessHelper [x] = "[" ++ show x ++ "]"
@@ -78,9 +72,7 @@ data Statement = If Expression [Statement] [Statement]
   | ExpressionStatement Expression
   | VariableAssignment [Expression] Expression
   | FunctionAssignment Expression [Expression] [Statement]
-  | TypeDeclaration Type Type
   deriving (Show,Eq)
-
 
 spaceConsumer :: Parser ()
 spaceConsumer = L.space
@@ -122,8 +114,8 @@ signedFloat :: Parser Double
 signedFloat = L.signed (return ()) float
 
 boolean :: Parser Bool
-boolean = do { symbol "true"; return True; }
-  <|> do { symbol "false"; return False; }
+boolean = do { symbol "True"; return True; }
+  <|> do { symbol "False"; return False; }
 
 operatorTable :: [[Operator Parser Expression]]
 operatorTable =
@@ -155,10 +147,7 @@ operatorTable =
   ]
 
 variable :: Parser Expression
-variable = Variable <$> (pack <$> lexeme ((:) <$> lowerChar <*> many alphaNumChar))
-
-typeVariable :: Parser Type
-typeVariable = Type <$> (pack <$> lexeme ((:) <$> upperChar <*> many alphaNumChar))
+variable = Variable <$> (pack <$> lexeme ((:) <$> letterChar <*> many alphaNumChar))
 
 annonFunction :: Parser Expression
 annonFunction = Annon
@@ -167,13 +156,6 @@ annonFunction = Annon
 
 functionCall :: Parser Expression
 functionCall = Application <$> variable <*> parens (expression `sepBy` (symbol ","))
-
-typeDefCall :: Parser Expression
-typeDefCall =  do
-  t <- typeVariable
-  ts <- parens (expression `sepBy` (symbol ","))
-  return $ TypeExpression t ts
-
 
 arrayAccess :: Parser Expression
 arrayAccess = ArrayAccess <$> variable <*> some (brackets expression)
@@ -201,7 +183,6 @@ term = choice
   , constant
   , try annonFunction
   , try functionCall
-  , try typeDefCall
   , try arrayAccess
   , variable
   , listLiteral
@@ -210,35 +191,16 @@ term = choice
 expression :: Parser Expression
 expression = makeExprParser term operatorTable
 
-
-
 statement :: Parser Statement
-statement = typeStatement
-  <|> ifStatement
+statement = ifStatement
   <|> forStatement
   <|> returnStatement
   <|> assignmentStatement
   <|> expressionStatement
 
-
-typeStatement = do
-  t <- typeVariable
-  symbol ":="
-  ts <- typeExpression `sepBy` (symbol (pack "|"))
-  symbol ";"
-  return $ TypeDeclaration t (Variant ts)
-
-typeExpression = (try typeFunction) <|> typeVariable
-
-
-typeFunction = do
-  t <- typeVariable
-  ts <- parens (typeExpression `sepBy` (symbol (pack ",")))
-  return $ Record t ts
-
-
 ifStatement = If
   <$ symbol "if"
+     <- getOffset
   <*> parens expression
   <*> braces (many statement)
   <*> (try (symbol "else" *> notFollowedBy (symbol "if") *> braces (many statement))
@@ -279,21 +241,8 @@ variableAssignment = VariableAssignment
 functionAssignment = FunctionAssignment
   <$> variable
   <* symbol ":="
-  <*> parens (variableArgs `sepBy` (symbol ","))
+  <*> parens (variable `sepBy` (symbol ","))
   <*> braces (many statement)
-
-
-variableArgs = (try typeFunctionArgs) <|> (try typeVariableArgs) <|> variable
-
-typeVariableArgs = do
-  t <- typeVariable
-  return $ TypeExpression t []
-
-typeFunctionArgs = do
-  t <- typeVariable
-  ts <- parens (variableArgs `sepBy` (symbol (pack ",")))
-  return $ TypeExpression t ts
-
 
 arrayAssignment = VariableAssignment
   <$> (do { a <- variable; as <- many (brackets expression); return (a : as); })
