@@ -56,7 +56,7 @@ instance Show Expression where
   show (Application a as) = show a ++ "(" ++ showExpressionListHelper as ++ ")"
   show (ArrayAccess a as) = show a ++ showArrayAccessHelper as
   show EmptyList = ""
-  show (TypeExpression t vs) = (show t) ++ "(" ++ (show vs) ++ ")"
+  show (TypeExpression t vs) = (show t) ++ "(" ++ (showExpressionListHelper vs) ++ ")"
 
 
 showArrayAccessHelper [x] = "[" ++ show x ++ "]"
@@ -166,7 +166,7 @@ annonFunction = Annon
   <*> braces (many statement)
 
 functionCall :: Parser Expression
-functionCall = Application <$> variable <*> parens (expression `sepBy` (symbol ","))
+functionCall = Application <$> variableArgs <*> parens (expression `sepBy` (symbol ","))
 
 typeDefCall :: Parser Expression
 typeDefCall =  do
@@ -285,14 +285,15 @@ functionAssignment = FunctionAssignment
 
 variableArgs = (try typeFunctionArgs) <|> (try typeVariableArgs) <|> variable
 
-typeVariableArgs = do
-  t <- typeVariable
-  return $ TypeExpression t []
-
 typeFunctionArgs = do
   t <- typeVariable
   ts <- parens (variableArgs `sepBy` (symbol (pack ",")))
   return $ TypeExpression t ts
+
+typeVariableArgs = do
+  t <- typeVariable
+  return $ TypeExpression t []
+
 
 
 arrayAssignment = VariableAssignment
